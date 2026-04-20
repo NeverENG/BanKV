@@ -1,0 +1,5 @@
+{
+  "MaxMemTableSize": 1024,
+  "WALPath": "../../../log/wal.log",
+  "SSTablePath": "../../../log"
+}
