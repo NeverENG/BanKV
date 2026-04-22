@@ -2,7 +2,9 @@ package zstorage
 
 import (
 	"encoding/binary"
+	"errors"
 	"hash/crc32"
+	"io"
 	"log/slog"
 	"os"
 
@@ -60,11 +62,17 @@ func (w *WAL) Write(entry istorage.LogEntry) error {
 }
 
 func (w *WAL) Read(apply func(istorage.LogEntry) error) {
+	if _, err := w.file.Seek(0, io.SeekStart); err != nil {
+		return
+	}
 	for {
 		header := make([]byte, HEADER_LENGTH)
 		_, err := w.file.Read(header)
 		if err != nil {
-			slog.Error("[ERROR]:READ WAL LOG ERROR !")
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				return
+			}
+			return
 		}
 
 		crc := binary.BigEndian.Uint32(header[:])
@@ -74,12 +82,18 @@ func (w *WAL) Read(apply func(istorage.LogEntry) error) {
 		key := make([]byte, keyLen)
 		_, err = w.file.Read(key)
 		if err != nil {
-			slog.Error("[ERROR]:READ WAL LOG ERROR;KEY !")
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			return
 		}
 		value := make([]byte, valueLen)
 		_, err = w.file.Read(value)
 		if err != nil {
-			slog.Error("[ERROR]:READ WAL LOG ERROR;VALUE !")
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			return
 		}
 
 		haser := crc32.NewIEEE()
@@ -91,7 +105,6 @@ func (w *WAL) Read(apply func(istorage.LogEntry) error) {
 		}
 		err = apply(istorage.LogEntry{key, value})
 		if err != nil {
-			slog.Error("[ERROR]:APPLY WAL LOG ERROR !")
 			return
 		}
 	}

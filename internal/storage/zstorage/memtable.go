@@ -28,7 +28,7 @@ type MemTable struct {
 
 	FlushChan chan bool
 
-	wal istorage.IWal
+	wal *WAL
 }
 
 // SkipNode 跳表节点
@@ -197,15 +197,15 @@ func (m *MemTable) Delete(key []byte) error {
 	return nil
 }
 
-func (m *MemTable) sync() error {
+func (m *MemTable) Sync() error {
 	return m.wal.Sync()
 }
 
-func (m *MemTable) clear() error {
+func (m *MemTable) Clear() error {
 	return m.wal.Clear()
 }
 
-func (m *MemTable) close() error {
+func (m *MemTable) Close() error {
 	return m.wal.Close()
 }
 
@@ -303,10 +303,11 @@ func (m *MemTable) writeToSSTable(entries []istorage.LogEntry) error {
 }
 
 // resetMemTable 重置内存表
-func (m *MemTable) resetMemTable() {
+func (m *MemTable) resetMemTable() error {
 	m.head = newSkipNode(MAXL, nil, nil)
 	m.size = 0
 	m.level = 0
 
-	m.wal.Clear()
+	err := m.Clear()
+	return err
 }

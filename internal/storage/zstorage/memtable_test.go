@@ -19,7 +19,6 @@ func BenchmarkMemTable_Set(b *testing.B) {
 func BenchmarkMemTable_Get(b *testing.B) {
 	memTable := NewMemTable()
 
-	// 预填充固定数量的数据
 	const prefillSize = 10000
 	for i := 0; i < prefillSize; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i))
@@ -29,19 +28,16 @@ func BenchmarkMemTable_Get(b *testing.B) {
 
 	b.ResetTimer()
 	var value []byte
-	var ok bool
 	for i := 0; i < b.N; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i%prefillSize))
-		value, ok = memTable.Get(key)
+		value, _ = memTable.Get(key)
 	}
 	_ = value
-	_ = ok
 }
 
 func BenchmarkMemTable_Delete(b *testing.B) {
 	memTable := NewMemTable()
 
-	// 预填充固定数量的数据
 	const prefillSize = 10000
 	for i := 0; i < prefillSize; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i))
@@ -50,12 +46,10 @@ func BenchmarkMemTable_Delete(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	var deleted bool
 	for i := 0; i < b.N; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i%prefillSize))
-		deleted = memTable.Delete(key)
+		memTable.Delete(key)
 	}
-	_ = deleted
 }
 
 func BenchmarkMemTable_SetStringKey(b *testing.B) {
@@ -72,7 +66,6 @@ func BenchmarkMemTable_SetStringKey(b *testing.B) {
 func BenchmarkMemTable_GetStringKey(b *testing.B) {
 	memTable := NewMemTable()
 
-	// 预填充固定数量的数据
 	const prefillSize = 10000
 	for i := 0; i < prefillSize; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i))
@@ -82,11 +75,9 @@ func BenchmarkMemTable_GetStringKey(b *testing.B) {
 
 	b.ResetTimer()
 	var value []byte
-	var ok bool
 	for i := 0; i < b.N; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i%prefillSize))
-		value, ok = memTable.Get(key)
+		value, _ = memTable.Get(key)
 	}
 	_ = value
-	_ = ok
 }
