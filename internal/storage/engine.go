@@ -7,16 +7,25 @@ import (
 	"github.com/NeverENG/BanKV/internal/storage/istorage"
 )
 
+type StorageCommand struct {
+	Type  string
+	Key   []byte
+	Value []byte
+}
+
 type Engine struct {
 	memTable istorage.IMemTable
-
-	mu sync.RWMutex
+	mu       sync.RWMutex
+	applyCh  chan StorageCommand
 }
 
 func NewEngine(memTable istorage.IMemTable) *Engine {
-	return &Engine{
+	e := &Engine{
 		memTable: memTable,
+		applyCh:  make(chan StorageCommand, 100),
 	}
+	go e.applyWorker()
+	return e
 }
 
 func (e *Engine) Put(key []byte, value []byte) error {
@@ -45,4 +54,24 @@ func (e *Engine) Delete(key []byte) error {
 	defer e.mu.Unlock()
 
 	return e.memTable.Delete(key)
+}
+
+func (e *Engine) Apply(cmd StorageCommand) error {
+	e.applyCh <- cmd
+	return nil
+}
+
+func (e *Engine) GetApplyCh() chan StorageCommand {
+	return e.applyCh
+}
+
+func (e *Engine) applyWorker() {
+	for cmd := range e.applyCh {
+		switch cmd.Type {
+		case "Put":
+			e.Put(cmd.Key, cmd.Value)
+		case "Delete":
+			e.Delete(cmd.Key)
+		}
+	}
 }
