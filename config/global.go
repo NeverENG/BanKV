@@ -74,10 +74,18 @@ func NewGlobalConfig() *GlobalConfig {
 
 // ParseFlags 解析命令行参数
 func (g *GlobalConfig) ParseFlags() {
-	// 定义命令行参数
-	meFlag := flag.Int("me", -1, "Current node index in peers list")
+	// 创建一个新的 FlagSet，避免与全局的 CommandLine 冲突
+	fs := flag.NewFlagSet("bankv", flag.ContinueOnError)
+	fs.Usage = func() {}
 
-	flag.Parse()
+	// 定义命令行参数
+	meFlag := fs.Int("me", -1, "Current node index in peers list")
+
+	// 解析命令行参数，忽略未定义的参数
+	err := fs.Parse(os.Args[1:])
+	if err != nil {
+		// 忽略错误，继续执行
+	}
 
 	// 处理命令行参数
 	if *meFlag >= 0 {

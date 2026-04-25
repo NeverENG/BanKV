@@ -9,25 +9,25 @@ import (
 )
 
 func setupTest(t *testing.T) (*FSM, func()) {
-	oldWALPath := config.Global.WALPath
-	oldMaxSize := config.Global.MaxMemTableSize
-	oldPeers := config.Global.Peers
-	oldMe := config.Global.Me
+	oldWALPath := config.G.WALPath
+	oldMaxSize := config.G.MaxMemTableSize
+	oldPeers := config.G.Peers
+	oldMe := config.G.Me
 
-	config.Global.WALPath = "test_service_wal.log"
-	config.Global.MaxMemTableSize = 100
-	config.Global.Peers = []string{"localhost:9000"}
-	config.Global.Me = 0
+	config.G.WALPath = "test_service_wal.log"
+	config.G.MaxMemTableSize = 100
+	config.G.Peers = []string{"localhost:9000"}
+	config.G.Me = 0
 
 	fsm := NewFSM()
 
 	cleanup := func() {
 		// 清理文件
 		os.Remove("test_service_wal.log")
-		config.Global.WALPath = oldWALPath
-		config.Global.MaxMemTableSize = oldMaxSize
-		config.Global.Peers = oldPeers
-		config.Global.Me = oldMe
+		config.G.WALPath = oldWALPath
+		config.G.MaxMemTableSize = oldMaxSize
+		config.G.Peers = oldPeers
+		config.G.Me = oldMe
 	}
 
 	return fsm, cleanup

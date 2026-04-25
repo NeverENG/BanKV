@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/NeverENG/BanKV/config"
 	"github.com/NeverENG/BanKV/internal/Raft"
@@ -22,7 +23,7 @@ type FSM struct {
 }
 
 // NewFSM 创建 FSM，自动从全局配置初始化 Raft 和存储
-// 从 config.Global.Peers 和 config.Global.Me 获取集群配置
+
 func NewFSM() *FSM {
 	// 从全局配置获取集群信息
 	peers := config.G.Peers
@@ -95,6 +96,21 @@ func (f *FSM) AppendEntry(cmd Command) (int, error) {
 		return -1, err
 	}
 	return f.raft.AppendEntry(cmdBytes), nil
+}
+
+// WaitForCommit 等待日志被提交
+func (f *FSM) WaitForCommit(index int) error {
+	// 检查当前提交索引
+	for {
+		commitIndex := f.raft.GetCommitIndex()
+
+		if commitIndex >= index {
+			return nil
+		}
+
+		// 等待一段时间后再检查
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // EncodeCommand 编码命令为 JSON

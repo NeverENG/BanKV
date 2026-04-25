@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/NeverENG/BanKV/config"
 	"github.com/NeverENG/BanKV/internal/network/ziface"
 )
 
@@ -47,7 +48,7 @@ func NewConnection(conn *net.TCPConn, ConnID uint32, handle ziface.IMsgHandle, s
 		ctx:          ctx,
 		cancel:       cancel,
 		msgChan:      make(chan []byte),
-		msgBuffChan:  make(chan []byte, util.G.MaxMsgChanLen),
+		msgBuffChan:  make(chan []byte, config.G.MaxMsgChanLen),
 	}
 	c.TCPServer.GetConnMgr().Add(c)
 	return c
@@ -93,7 +94,7 @@ func (c *Connection) StartReader() {
 			conn: c,
 		}
 		// 根据有没有启动 WorkPool 选择不同的结果
-		if util.G.WorkerPoolSize > 0 {
+		if config.G.WorkerPoolSize > 0 {
 			c.MsgHandle.SendMsgToTaskQueue(&req)
 		} else {
 			go c.MsgHandle.DoMsgHandle(&req)

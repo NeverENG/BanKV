@@ -9,8 +9,8 @@ import (
 )
 
 func setupTestWAL(t *testing.T) *WAL {
-	oldPath := config.Global.WALPath
-	config.Global.WALPath = "test_wal.log"
+	oldPath := config.G.WALPath
+	config.G.WALPath = "test_wal.log"
 	wal := NewWAL()
 	if wal == nil {
 		t.Skip("WAL initialization failed, skipping test")
@@ -18,7 +18,7 @@ func setupTestWAL(t *testing.T) *WAL {
 	t.Cleanup(func() {
 		wal.Close()
 		os.Remove("test_wal.log")
-		config.Global.WALPath = oldPath
+		config.G.WALPath = oldPath
 	})
 	return wal
 }

@@ -1,6 +1,8 @@
 package znet
 
-import "zinx/src/ziface"
+import (
+	"github.com/NeverENG/BanKV/internal/network/ziface"
+)
 
 type Message struct {
 	Id uint32
@@ -11,7 +13,7 @@ type Message struct {
 
 var _ ziface.IMessage = &Message{}
 
-func NewMassage(id uint32, data []byte) *Message {
+func NewMessage(id uint32, data []byte) *Message {
 	return &Message{
 		Id:      id,
 		DataLen: uint32(len(data)),

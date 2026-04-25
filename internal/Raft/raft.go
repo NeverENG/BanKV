@@ -423,3 +423,10 @@ func (r *Raft) GetApplyCh() chan LogEntry {
 func (r *Raft) RegisterApplyCh(ch chan LogEntry) {
 	r.applyCh = ch
 }
+
+// GetCommitIndex 获取当前提交索引
+func (r *Raft) GetCommitIndex() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.commitIndex
+}
