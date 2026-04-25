@@ -9,11 +9,11 @@ import (
 )
 
 func setupTestEngine(t *testing.T) (*Engine, func()) {
-	oldWALPath := config.Global.WALPath
-	oldMaxSize := config.Global.MaxMemTableSize
+	oldWALPath := config.G.WALPath
+	oldMaxSize := config.G.MaxMemTableSize
 
-	config.Global.WALPath = "test_engine_wal.log"
-	config.Global.MaxMemTableSize = 100
+	config.G.WALPath = "test_engine_wal.log"
+	config.G.MaxMemTableSize = 100
 
 	memTable := zstorage.NewMemTable()
 	engine := NewEngine(memTable)
@@ -27,8 +27,8 @@ func setupTestEngine(t *testing.T) (*Engine, func()) {
 		// 删除测试文件
 		os.Remove("test_engine_wal.log")
 		// 恢复配置
-		config.Global.WALPath = oldWALPath
-		config.Global.MaxMemTableSize = oldMaxSize
+		config.G.WALPath = oldWALPath
+		config.G.MaxMemTableSize = oldMaxSize
 	}
 
 	return engine, cleanup
@@ -153,8 +153,8 @@ func TestEngine_UpdateExistingKey(t *testing.T) {
 }
 
 func TestEngine_PutTriggersFlush(t *testing.T) {
-	oldMaxSize := config.Global.MaxMemTableSize
-	config.Global.MaxMemTableSize = 5
+	oldMaxSize := config.G.MaxMemTableSize
+	config.G.MaxMemTableSize = 5
 
 	memTable := zstorage.NewMemTable()
 	engine := NewEngine(memTable)
@@ -172,6 +172,6 @@ func TestEngine_PutTriggersFlush(t *testing.T) {
 		t.Logf("MemTable size after 10 puts: %d (flush may have been triggered)", memTable.Size())
 	}
 
-	config.Global.MaxMemTableSize = oldMaxSize
+	config.G.MaxMemTableSize = oldMaxSize
 	os.Remove("test_engine_wal.log")
 }

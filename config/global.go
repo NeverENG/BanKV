@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+
+	"github.com/NeverENG/BanKV/internal/network/ziface"
 )
 
 type GlobalConfig struct {
@@ -17,6 +19,17 @@ type GlobalConfig struct {
 	SSTablePath string
 
 	MaxMemTableSize int
+
+	TcpServer ziface.IServer
+
+	Version string
+
+	MaxConn        int
+	MaxPackageSize uint32
+
+	WorkerPoolSize   uint32
+	MaxWorkerTaskLen uint32
+	MaxMsgChanLen    uint32
 
 	// Raft 集群配置
 	Peers []string // 集群中所有节点的地址
@@ -37,11 +50,22 @@ func (g *GlobalConfig) Init() {
 
 func NewGlobalConfig() *GlobalConfig {
 	global := &GlobalConfig{
-		MaxMemTableSize: 1024,
-		WALPath:         "../../../log/wal.log",
-		SSTablePath:     "../../../log",
-		Peers:           []string{"localhost:8080"}, // 默认单节点
-		Me:              0,                          // 默认节点ID
+
+		Name:             "Raft",
+		Port:             8080,
+		Host:             "localhost",
+		Version:          "1.0.0",
+		MaxConn:          1000,
+		MaxPackageSize:   1024,
+		WorkerPoolSize:   10,
+		MaxWorkerTaskLen: 10000,
+		MaxMsgChanLen:    100,
+		TcpServer:        nil,
+		MaxMemTableSize:  1024,
+		WALPath:          "../../../log/wal.log",
+		SSTablePath:      "../../../log",
+		Peers:            []string{"localhost:8080"}, // 默认单节点
+		Me:               0,                          // 默认节点ID
 	}
 	global.Init()
 	global.ParseFlags()
@@ -80,4 +104,4 @@ func (g *GlobalConfig) ParseFlags() {
 	slog.Info("[INFO]:CONFIG FINALIZED", "peers", g.Peers, "me", g.Me)
 }
 
-var Global = NewGlobalConfig()
+var G = NewGlobalConfig()

@@ -22,7 +22,7 @@ type WAL struct {
 }
 
 func NewWAL() *WAL {
-	file, err := os.OpenFile(config.Global.WALPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+	file, err := os.OpenFile(config.G.WALPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		slog.Error("[ERROR]:OPEN WAL LOG ERROR !")
 		return nil

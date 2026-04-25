@@ -4,7 +4,7 @@ gokv/
 ├── cmd/
 │   └── server/          # 程序的入口，负责解析 flag、初始化并启动服务
 │       └── main.go
-├── internal/            # 私有逻辑，不希望被作为第三方库引用
+├── internal/# 私有逻辑，不希望被作为第三方库引用
 │   ├── storage/         # 存储引擎核心 (LSM-Tree)
 │   │   ├── memtable.go  # 内存表 (跳表实现)
 │   │   ├── sstable.go   # 磁盘有序表 (SSTable 读写逻辑)

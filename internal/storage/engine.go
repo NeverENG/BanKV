@@ -36,7 +36,7 @@ func (e *Engine) Put(key []byte, value []byte) error {
 	if err != nil {
 		return err
 	}
-	if e.memTable.Size() > config.Global.MaxMemTableSize {
+	if e.memTable.Size() > config.G.MaxMemTableSize {
 		e.memTable.StartFlush()
 	}
 	return nil

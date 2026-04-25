@@ -25,8 +25,8 @@ type FSM struct {
 // 从 config.Global.Peers 和 config.Global.Me 获取集群配置
 func NewFSM() *FSM {
 	// 从全局配置获取集群信息
-	peers := config.Global.Peers
-	me := config.Global.Me
+	peers := config.G.Peers
+	me := config.G.Me
 
 	// 初始化 Raft
 	raft := Raft.NewRaft(peers, me)
