@@ -82,7 +82,14 @@ func (k *KVServer) apply(entry Raft.LogEntry) {
 
 // Get 从存储获取值
 func (k *KVServer) Get(key []byte) ([]byte, error) {
-	return k.storage.Get(key)
+	fmt.Printf("[INFO] Get called with key: %s\n", string(key))
+	value, err := k.storage.Get(key)
+	if err != nil {
+		fmt.Printf("[ERROR] Get failed: %v\n", err)
+	} else {
+		fmt.Printf("[INFO] Get result: %s\n", string(value))
+	}
+	return value, err
 }
 
 /* Put 直接写入存储（仅用于测试，生产环境应通过 Raft 写入）
@@ -104,17 +111,22 @@ func (k *KVServer) GetRaft() *Raft.Raft {
 
 // AppendEntry 通过 Raft 追加日志
 func (k *KVServer) AppendEntry(cmd Command) (int, error) {
+	fmt.Printf("[INFO] AppendEntry called: Type=%s, Key=%s\n", cmd.Type, string(cmd.Key))
 	cmdBytes, err := EncodeCommand(cmd)
 	if err != nil {
 		return -1, err
 	}
-	return k.raft.AppendEntry(cmdBytes), nil
+	index := k.raft.AppendEntry(cmdBytes)
+	fmt.Printf("[INFO] AppendEntry returned index: %d\n", index)
+	return index, nil
 }
 
 // WaitForCommit 等待日志被提交
 func (k *KVServer) WaitForCommit(index int) error {
+	fmt.Printf("[INFO] WaitForCommit called with index: %d\n", index)
 	// 检查当前提交索引
 	k.raft.WaitCommitIndex(index)
+	fmt.Printf("[INFO] WaitForCommit completed for index: %d\n", index)
 	return nil
 
 }

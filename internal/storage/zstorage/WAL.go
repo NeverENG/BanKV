@@ -24,13 +24,20 @@ type WAL struct {
 func NewWAL() *WAL {
 	file, err := os.OpenFile(config.G.WALPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
-		slog.Error("[ERROR]:OPEN WAL LOG ERROR !")
-		return nil
+		slog.Error("[ERROR]:OPEN WAL LOG ERROR !", "path", config.G.WALPath, "error", err)
+		slog.Warn("[WARN]:WAL DISABLED, DATA WILL NOT BE PERSISTED")
+		// 返回一个空的 WAL，不报错
+		return &WAL{file: nil}
 	}
+	slog.Info("[INFO]:WAL OPENED SUCCESSFULLY", "path", config.G.WALPath)
 	return &WAL{file: file}
 }
 
 func (w *WAL) Write(entry istorage.LogEntry) error {
+	// 如果 file 为 nil，跳过写入（WAL 禁用模式）
+	if w.file == nil {
+		return nil
+	}
 
 	hasher := crc32.NewIEEE()
 	hasher.Write(entry.Key)
@@ -62,6 +69,10 @@ func (w *WAL) Write(entry istorage.LogEntry) error {
 }
 
 func (w *WAL) Read(apply func(istorage.LogEntry) error) {
+	// 如果 file 为 nil，跳过读取
+	if w.file == nil {
+		return
+	}
 	if _, err := w.file.Seek(0, io.SeekStart); err != nil {
 		return
 	}
@@ -111,9 +122,15 @@ func (w *WAL) Read(apply func(istorage.LogEntry) error) {
 }
 
 func (w *WAL) Close() error {
+	if w.file == nil {
+		return nil
+	}
 	return w.file.Close()
 }
 func (w *WAL) Sync() error {
+	if w.file == nil {
+		return nil
+	}
 	return w.file.Sync()
 }
 

@@ -1,6 +1,7 @@
 package Raft
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -114,6 +115,8 @@ func (r *Raft) startElection() {
 		return
 	}
 
+	fmt.Printf("[RAFT] Starting election, current state=%v, Term=%d\n", r.state, r.Term)
+
 	r.state = Candidate
 	r.Term++
 	r.votedFor = r.me
@@ -168,14 +171,28 @@ func (r *Raft) startElection() {
 
 	r.mu.Unlock()
 
+	// 自己投自己一票
 	votes := 1
-	timeout := time.After(500 * time.Millisecond)
+	granted := make(chan bool, peerCount)
 
+	// 单节点模式：自己一票就超过半数，直接成为 Leader
+	if votes > len(r.peers)/2 {
+		r.mu.Lock()
+		if r.state == Candidate {
+			r.becomeLeader()
+		}
+		r.mu.Unlock()
+		return
+	}
+
+	// 等待投票结果或超时
+	timeout := time.After(500 * time.Millisecond)
 	for j := 0; j < peerCount; j++ {
 		select {
-		case voted := <-voteCh:
-			if voted {
+		case voteGranted := <-granted:
+			if voteGranted {
 				votes++
+				// 获得多数票，成为 Leader
 				if votes > len(r.peers)/2 {
 					r.mu.Lock()
 					if r.state == Candidate {
@@ -186,6 +203,7 @@ func (r *Raft) startElection() {
 				}
 			}
 		case <-timeout:
+			// 选举超时，重置为 Follower
 			r.mu.Lock()
 			if r.state == Candidate {
 				r.state = Follower
@@ -195,16 +213,10 @@ func (r *Raft) startElection() {
 			return
 		}
 	}
-
-	r.mu.Lock()
-	if r.state == Candidate {
-		r.state = Follower
-		r.votedFor = -1
-	}
-	r.mu.Unlock()
 }
 
 func (r *Raft) becomeLeader() {
+	fmt.Printf("[RAFT] Becoming Leader, Term=%d\n", r.Term)
 	r.state = Leader
 
 	for i := range r.peers {
@@ -212,6 +224,7 @@ func (r *Raft) becomeLeader() {
 		r.matchIndex[i] = -1
 	}
 
+	fmt.Printf("[RAFT] Started heartbeat loop\n")
 	r.startHeartbeatLoop()
 }
 
@@ -329,6 +342,7 @@ func (r *Raft) AppendEntry(command []byte) int {
 	defer r.mu.Unlock()
 
 	if r.state != Leader {
+		fmt.Printf("[RAFT] AppendEntry failed: not leader, state=%v\n", r.state)
 		return -1
 	}
 
@@ -339,9 +353,12 @@ func (r *Raft) AppendEntry(command []byte) int {
 	}
 	r.log = append(r.log, entry)
 
+	fmt.Printf("[RAFT] Appended entry: Index=%d, Term=%d\n", entry.Index, entry.Term)
+
 	// 单节点模式：立即提交
 	if len(r.peers) == 1 {
 		r.commitIndex = entry.Index
+		fmt.Printf("[RAFT] Single node mode, committed index: %d\n", r.commitIndex)
 		r.applyCommittedLogs()
 		r.commitCond.Broadcast()
 	} else {

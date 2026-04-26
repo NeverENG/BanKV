@@ -90,8 +90,10 @@ func (m *MemTable) Get(key []byte) ([]byte, error) {
 	// 检查下一层的节点是否匹配
 	p = p.Next[0]
 	if p != nil && bytes.Compare(p.Key, key) == 0 {
+		fmt.Printf("[MEMTABLE] Get found: key=%s, value=%s\n", string(key), string(p.Value))
 		return p.Value, nil
 	}
+	fmt.Printf("[MEMTABLE] Get not found: key=%s\n", string(key))
 	return nil, nil
 }
 
@@ -148,7 +150,7 @@ func (m *MemTable) Put(key []byte, value []byte) error {
 	}
 
 	m.size++
-	fmt.Println("Put Sucessful")
+	fmt.Printf("[MEMTABLE] Put success: key=%s, value=%s, size=%d\n", string(key), string(value), m.size)
 	return nil
 }
 
