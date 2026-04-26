@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/binary"
+	"log/slog"
 
 	"github.com/NeverENG/BanKV/internal/network/ziface"
 )
@@ -60,6 +61,7 @@ func (r *Router) Handle(request ziface.IRequest) {
 func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 	// 解析数据格式：key_len + key + value_len + value
 	if len(data) < 8 {
+		slog.Warn("[WARN] handlePut: data too short", "len", len(data))
 		return
 	}
 
@@ -68,11 +70,14 @@ func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 	valueLen := int(binary.LittleEndian.Uint32(data[4:8]))
 
 	if len(data) < 8+keyLen+valueLen {
+		slog.Warn("[WARN] handlePut: incomplete data", "expected", 8+keyLen+valueLen, "got", len(data))
 		return
 	}
 
 	key := data[8 : 8+keyLen]
 	value := data[8+keyLen : 8+keyLen+valueLen]
+
+	slog.Info("[INFO] handlePut", "key", string(key), "value", string(value))
 
 	// 创建命令并通过 Raft 追加日志
 	cmd := Command{
@@ -83,6 +88,7 @@ func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 
 	index, err := r.kv.AppendEntry(cmd)
 	if err != nil {
+		slog.Error("[ERROR] handlePut: AppendEntry failed", "error", err)
 		// 发送错误响应
 		response := []byte{0x01} // 错误标志
 		request.GetConnection().SendMsg(5, response)
@@ -91,6 +97,7 @@ func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 
 	// 等待 Raft 提交确认
 	if err := r.kv.WaitForCommit(index); err != nil {
+		slog.Error("[ERROR] handlePut: WaitForCommit failed", "error", err)
 		// 发送错误响应
 		response := []byte{0x01} // 错误标志
 		request.GetConnection().SendMsg(5, response)
@@ -98,6 +105,7 @@ func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 	}
 
 	// 发送成功响应
+	slog.Info("[INFO] handlePut: success")
 	response := []byte{0x00} // 成功标志
 	request.GetConnection().SendMsg(4, response)
 }

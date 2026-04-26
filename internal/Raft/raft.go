@@ -339,7 +339,14 @@ func (r *Raft) AppendEntry(command []byte) int {
 	}
 	r.log = append(r.log, entry)
 
-	r.replicateLog()
+	// 单节点模式：立即提交
+	if len(r.peers) == 1 {
+		r.commitIndex = entry.Index
+		r.applyCommittedLogs()
+		r.commitCond.Broadcast()
+	} else {
+		r.replicateLog()
+	}
 
 	return entry.Index
 }

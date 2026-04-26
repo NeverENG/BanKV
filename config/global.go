@@ -37,14 +37,37 @@ type GlobalConfig struct {
 }
 
 func (g *GlobalConfig) Init() {
-	data, err := os.ReadFile("config.json")
-	if err != nil {
-		slog.Error("[ERROR]:READ CONFIG ERROR !")
+	// 尝试多个可能的路径
+	paths := []string{
+		"config/config.json",      // 从项目根目录运行
+		"../config/config.json",   // 从 cmd/server 或 cmd/client 运行
+		"../../config/config.json", // 从更深层目录运行
+		"config.json",             // 当前目录
 	}
+	
+	var data []byte
+	var err error
+	
+	for _, path := range paths {
+		data, err = os.ReadFile(path)
+		if err == nil {
+			slog.Info("[INFO]:CONFIG FILE FOUND", "path", path)
+			break
+		}
+	}
+	
+	if err != nil {
+		slog.Error("[ERROR]:READ CONFIG ERROR !", "error", err)
+		slog.Warn("[WARN]:USING DEFAULT CONFIG")
+		return // 使用默认配置，不退出
+	}
+	
 	err = json.Unmarshal(data, g)
 	if err != nil {
-		slog.Error("[ERROR]:CONFIG INIT ERROR")
+		slog.Error("[ERROR]:CONFIG PARSE ERROR", "error", err)
+		return
 	}
+	
 	slog.Info("[INFO]:CONFIG INIT SUCCESS")
 }
 

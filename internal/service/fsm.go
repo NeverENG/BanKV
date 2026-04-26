@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/NeverENG/BanKV/config"
 	"github.com/NeverENG/BanKV/internal/Raft"
@@ -44,7 +45,9 @@ func NewKVServer() *KVServer {
 
 // Run 运行 FSM
 func (k *KVServer) Run() {
+	fmt.Println("[INFO] KVServer Run started, waiting for Raft entries...")
 	for entry := range k.raft.GetApplyCh() {
+		fmt.Printf("[INFO] Received Raft entry: Index=%d, Term=%d\n", entry.Index, entry.Term)
 		k.apply(entry)
 	}
 }
@@ -53,15 +56,27 @@ func (k *KVServer) Run() {
 func (k *KVServer) apply(entry Raft.LogEntry) {
 	var cmd Command
 	if err := json.Unmarshal(entry.Command, &cmd); err != nil {
+		fmt.Printf("[ERROR] Failed to unmarshal command: %v\n", err)
 		return
 	}
 
+	fmt.Printf("[INFO] Applying command: Type=%s, Key=%s\n", cmd.Type, string(cmd.Key))
+
 	switch cmd.Type {
 	case "Put":
-
-		k.storage.Put(cmd.Key, cmd.Value)
+		err := k.storage.Put(cmd.Key, cmd.Value)
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to put: %v\n", err)
+		} else {
+			fmt.Printf("[INFO] Put success: %s = %s\n", string(cmd.Key), string(cmd.Value))
+		}
 	case "Delete":
-		k.storage.Delete(cmd.Key)
+		err := k.storage.Delete(cmd.Key)
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to delete: %v\n", err)
+		} else {
+			fmt.Printf("[INFO] Delete success: %s\n", string(cmd.Key))
+		}
 	}
 }
 
@@ -99,12 +114,9 @@ func (k *KVServer) AppendEntry(cmd Command) (int, error) {
 // WaitForCommit 等待日志被提交
 func (k *KVServer) WaitForCommit(index int) error {
 	// 检查当前提交索引
-	for {
-		commitIndex := k.raft.GetCommitIndex()
-		if commitIndex >= index {
-			return nil
-		}
-	}
+	k.raft.WaitCommitIndex(index)
+	return nil
+
 }
 
 // EncodeCommand 编码命令为 JSON
