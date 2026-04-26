@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/NeverENG/BanKV/cmd/client"
 )
 
 func main() {
@@ -17,7 +15,7 @@ func main() {
 	addr := "localhost:8080" // 默认服务端地址
 
 	// 创建客户端
-	c := client.NewClient(addr)
+	c := NewClient(addr)
 
 	// 连接服务端
 	err := c.Connect()
