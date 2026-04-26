@@ -6,15 +6,15 @@ import (
 
 // HA 高可用管理
 type HA struct {
-	fsm       *FSM
+	kv        *KVServer
 	isHealthy bool
 	lastCheck time.Time
 }
 
 // NewHA 创建 HA 管理实例
-func NewHA(fsm *FSM) *HA {
+func NewHA(kv *KVServer) *HA {
 	ha := &HA{
-		fsm:       fsm,
+		kv:        kv,
 		isHealthy: true,
 		lastCheck: time.Now(),
 	}
@@ -39,7 +39,7 @@ func (h *HA) healthCheckLoop() {
 // checkHealth 检查健康状态
 func (h *HA) checkHealth() {
 	// 检查 Raft 状态
-	state, _ := h.fsm.GetRaft().GetState()
+	state, _ := h.kv.GetRaft().GetState()
 	if state == 0 { // Follower
 		// 可以添加更多健康检查逻辑
 	}
@@ -60,6 +60,6 @@ func (h *HA) GetLastCheck() time.Time {
 }
 
 // GetFSM 获取 FSM 实例
-func (h *HA) GetFSM() *FSM {
-	return h.fsm
+func (h *HA) GetFSM() *KVServer {
+	return h.kv
 }

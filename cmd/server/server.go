@@ -9,19 +9,19 @@ import (
 
 func main() {
 	// 初始化 FSM
-	fsm := service.NewFSM()
+	KVServer := service.NewKVServer()
 
 	// 启动 FSM
-	go fsm.Run()
+	go KVServer.Run()
 
 	// 初始化 HA
-	ha := service.NewHA(fsm)
+	ha := service.NewHA(KVServer)
 
 	// 初始化网络服务
 	server := znet.NewServer()
 
 	// 创建路由
-	router := service.NewRouter(fsm)
+	router := service.NewRouter(KVServer)
 
 	// 注册路由
 	server.AddRouter(1, router) // PUT 操作

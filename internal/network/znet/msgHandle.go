@@ -19,7 +19,8 @@ func NewMsgHandle() *MsgHandle {
 	return &MsgHandle{
 		Arip:           make(map[uint32]ziface.IRouter),
 		WorkerPoolSize: config.G.WorkerPoolSize,
-		TaskQueue:      make([]chan ziface.IRequest, config.G.MaxWorkerTaskLen),
+		TaskQueue:      make([]chan ziface.IRequest, config.G.WorkerPoolSize),
+		ctx:            context.Background(),
 	}
 }
 

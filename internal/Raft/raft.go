@@ -46,9 +46,11 @@ type Raft struct {
 
 	electionCh  chan bool
 	heartbeatCh chan bool
-	applyCh     chan LogEntry
+	ApplyCh     chan LogEntry
 
 	addrMap map[int]string
+
+	commitCond *sync.Cond
 }
 
 func NewRaft(peers []string, me int) *Raft {
@@ -71,9 +73,11 @@ func NewRaft(peers []string, me int) *Raft {
 		log:             make([]LogEntry, 0),
 		electionCh:      make(chan bool),
 		heartbeatCh:     make(chan bool),
-		applyCh:         make(chan LogEntry, 100),
+		ApplyCh:         make(chan LogEntry, 100),
 		addrMap:         addrMap,
 	}
+
+	r.commitCond = sync.NewCond(&r.mu)
 
 	go r.electionLoop()
 
@@ -305,6 +309,7 @@ func (r *Raft) updateCommitIndex() {
 		if count > len(r.peers)/2 && r.log[n].Term == r.Term {
 			r.commitIndex = n
 			r.applyCommittedLogs()
+			r.commitCond.Broadcast()
 			break
 		}
 	}
@@ -313,8 +318,8 @@ func (r *Raft) updateCommitIndex() {
 func (r *Raft) applyCommittedLogs() {
 	for r.lastApplied < r.commitIndex {
 		r.lastApplied++
-		if r.applyCh != nil {
-			r.applyCh <- r.log[r.lastApplied]
+		if r.ApplyCh != nil {
+			r.ApplyCh <- r.log[r.lastApplied]
 		}
 	}
 }
@@ -402,6 +407,15 @@ func (r *Raft) replicateLog() {
 	}
 }
 
+func (r *Raft) WaitCommitIndex(index int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for r.commitIndex < index {
+		r.commitCond.Wait()
+	}
+}
+
 func (r *Raft) GetState() (State, int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -417,11 +431,7 @@ func (r *Raft) GetLog() []LogEntry {
 }
 
 func (r *Raft) GetApplyCh() chan LogEntry {
-	return r.applyCh
-}
-
-func (r *Raft) RegisterApplyCh(ch chan LogEntry) {
-	r.applyCh = ch
+	return r.ApplyCh
 }
 
 // GetCommitIndex 获取当前提交索引

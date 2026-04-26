@@ -89,15 +89,12 @@ func (c *Connection) StartReader() {
 			}
 		}
 		msg.SetData(data)
-		req := Request{
-			msg:  msg,
-			conn: c,
-		}
+		req := NewRequest(msg, c)
 		// 根据有没有启动 WorkPool 选择不同的结果
 		if config.G.WorkerPoolSize > 0 {
-			c.MsgHandle.SendMsgToTaskQueue(&req)
+			c.MsgHandle.SendMsgToTaskQueue(req)
 		} else {
-			go c.MsgHandle.DoMsgHandle(&req)
+			go c.MsgHandle.DoMsgHandle(req)
 		}
 	}
 }
@@ -175,7 +172,7 @@ func (c *Connection) RemoteAddr() net.Addr {
 func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 	dp := NewDataPack()
 
-	msg := NewMassage(msgId, data)
+	msg := NewMessage(msgId, data)
 	Gdata, err := dp.Pack(msg)
 	if err != nil {
 		return err
@@ -188,7 +185,7 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 
 func (c *Connection) SendBuffMsg(msgId uint32, data []byte) error {
 	dp := NewDataPack()
-	msg := NewMassage(msgId, data)
+	msg := NewMessage(msgId, data)
 	Gdata, err := dp.Pack(msg)
 	if err != nil {
 		return err

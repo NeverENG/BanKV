@@ -132,8 +132,8 @@ func (r *RaftRPC) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesRep
 func (r *RaftRPC) applyCommittedLogs() {
 	for r.raft.lastApplied < r.raft.commitIndex {
 		r.raft.lastApplied++
-		if r.raft.applyCh != nil {
-			r.raft.applyCh <- r.raft.log[r.raft.lastApplied]
+		if r.raft.ApplyCh != nil {
+			r.raft.ApplyCh <- r.raft.log[r.raft.lastApplied]
 		}
 	}
 }

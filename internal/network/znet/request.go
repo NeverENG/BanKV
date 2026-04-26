@@ -9,6 +9,12 @@ type Request struct {
 
 var _ ziface.IRequest = &Request{}
 
+func NewRequest(msg ziface.IMessage, conn ziface.IConnect) *Request {
+	return &Request{
+		msg:  msg,
+		conn: conn,
+	}
+}
 func (req *Request) GetMsgData() []byte {
 	return req.msg.GetData()
 }

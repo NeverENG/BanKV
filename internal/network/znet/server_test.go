@@ -150,7 +150,6 @@ func TestServer(t *testing.T) {
 	go ClientTest1()
 	go ClientTest2()
 	s.AddRouter(1, &Router1{BaseRouter{}})
-
 	s.AddRouter(2, &Router2{BaseRouter{}})
 	s.Serve()
 }

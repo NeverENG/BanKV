@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/NeverENG/BanKV/config"
 	"github.com/NeverENG/BanKV/internal/Raft"
@@ -16,15 +15,14 @@ type Command struct {
 	Value []byte
 }
 
-type FSM struct {
+type KVServer struct {
 	raft    *Raft.Raft
 	storage *storage.Engine
-	applyCh chan Raft.LogEntry
 }
 
 // NewFSM 创建 FSM，自动从全局配置初始化 Raft 和存储
 
-func NewFSM() *FSM {
+func NewKVServer() *KVServer {
 	// 从全局配置获取集群信息
 	peers := config.G.Peers
 	me := config.G.Me
@@ -36,26 +34,23 @@ func NewFSM() *FSM {
 	memTable := zstorage.NewMemTable()
 	store := storage.NewEngine(memTable)
 
-	fsm := &FSM{
+	KVServer := &KVServer{
 		raft:    raft,
 		storage: store,
-		applyCh: make(chan Raft.LogEntry, 100),
 	}
 
-	raft.RegisterApplyCh(fsm.applyCh)
-
-	return fsm
+	return KVServer
 }
 
 // Run 运行 FSM
-func (f *FSM) Run() {
-	for entry := range f.applyCh {
-		f.apply(entry)
+func (k *KVServer) Run() {
+	for entry := range k.raft.GetApplyCh() {
+		k.apply(entry)
 	}
 }
 
 // apply 应用日志到存储
-func (f *FSM) apply(entry Raft.LogEntry) {
+func (k *KVServer) apply(entry Raft.LogEntry) {
 	var cmd Command
 	if err := json.Unmarshal(entry.Command, &cmd); err != nil {
 		return
@@ -63,53 +58,52 @@ func (f *FSM) apply(entry Raft.LogEntry) {
 
 	switch cmd.Type {
 	case "Put":
-		f.storage.Put(cmd.Key, cmd.Value)
+
+		k.storage.Put(cmd.Key, cmd.Value)
 	case "Delete":
-		f.storage.Delete(cmd.Key)
+		k.storage.Delete(cmd.Key)
 	}
 }
 
 // Get 从存储获取值
-func (f *FSM) Get(key []byte) ([]byte, error) {
-	return f.storage.Get(key)
+func (k *KVServer) Get(key []byte) ([]byte, error) {
+	return k.storage.Get(key)
 }
 
-// Put 直接写入存储（仅用于测试，生产环境应通过 Raft 写入）
-func (f *FSM) Put(key []byte, value []byte) error {
-	return f.storage.Put(key, value)
+/* Put 直接写入存储（仅用于测试，生产环境应通过 Raft 写入）
+func (k *KVServer) Put(key []byte, value []byte) error {
+	return k.storage.Put(key, value)
 }
+*/
 
-// Delete 直接删除存储中的值（仅用于测试，生产环境应通过 Raft 写入）
-func (f *FSM) Delete(key []byte) error {
-	return f.storage.Delete(key)
+/* Delete 直接删除存储中的值（仅用于测试，生产环境应通过 Raft 写入）
+func (k *KVServer) Delete(key []byte) error {
+	return k.storage.Delete(key)
 }
+*/
 
 // GetRaft 获取 Raft 实例
-func (f *FSM) GetRaft() *Raft.Raft {
-	return f.raft
+func (k *KVServer) GetRaft() *Raft.Raft {
+	return k.raft
 }
 
 // AppendEntry 通过 Raft 追加日志
-func (f *FSM) AppendEntry(cmd Command) (int, error) {
+func (k *KVServer) AppendEntry(cmd Command) (int, error) {
 	cmdBytes, err := EncodeCommand(cmd)
 	if err != nil {
 		return -1, err
 	}
-	return f.raft.AppendEntry(cmdBytes), nil
+	return k.raft.AppendEntry(cmdBytes), nil
 }
 
 // WaitForCommit 等待日志被提交
-func (f *FSM) WaitForCommit(index int) error {
+func (k *KVServer) WaitForCommit(index int) error {
 	// 检查当前提交索引
 	for {
-		commitIndex := f.raft.GetCommitIndex()
-
+		commitIndex := k.raft.GetCommitIndex()
 		if commitIndex >= index {
 			return nil
 		}
-
-		// 等待一段时间后再检查
-		time.Sleep(10 * time.Millisecond)
 	}
 }
 

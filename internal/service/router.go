@@ -8,7 +8,7 @@ import (
 
 // Router 基础路由处理器
 type Router struct {
-	fsm *FSM
+	kv *KVServer
 
 	// 前置处理函数
 	preHandleFunc func(request ziface.IRequest)
@@ -17,9 +17,9 @@ type Router struct {
 }
 
 // NewRouter 创建新的路由处理器
-func NewRouter(fsm *FSM) *Router {
+func NewRouter(kv *KVServer) *Router {
 	return &Router{
-		fsm: fsm,
+		kv: kv,
 	}
 }
 
@@ -81,7 +81,7 @@ func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 		Value: value,
 	}
 
-	index, err := r.fsm.AppendEntry(cmd)
+	index, err := r.kv.AppendEntry(cmd)
 	if err != nil {
 		// 发送错误响应
 		response := []byte{0x01} // 错误标志
@@ -90,7 +90,7 @@ func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 	}
 
 	// 等待 Raft 提交确认
-	if err := r.fsm.WaitForCommit(index); err != nil {
+	if err := r.kv.WaitForCommit(index); err != nil {
 		// 发送错误响应
 		response := []byte{0x01} // 错误标志
 		request.GetConnection().SendMsg(5, response)
@@ -119,7 +119,7 @@ func (r *Router) handleGet(data []byte, request ziface.IRequest) {
 	key := data[4 : 4+keyLen]
 
 	// 从存储获取值
-	value, err := r.fsm.Get(key)
+	value, err := r.kv.Get(key)
 	if err != nil {
 		// 发送错误响应
 		response := []byte{0x01} // 错误标志
@@ -162,7 +162,7 @@ func (r *Router) handleDelete(data []byte, request ziface.IRequest) {
 		Key:  key,
 	}
 
-	index, err := r.fsm.AppendEntry(cmd)
+	index, err := r.kv.AppendEntry(cmd)
 	if err != nil {
 		// 发送错误响应
 		response := []byte{0x01} // 错误标志
@@ -171,7 +171,7 @@ func (r *Router) handleDelete(data []byte, request ziface.IRequest) {
 	}
 
 	// 等待 Raft 提交确认
-	if err := r.fsm.WaitForCommit(index); err != nil {
+	if err := r.kv.WaitForCommit(index); err != nil {
 		// 发送错误响应
 		response := []byte{0x01} // 错误标志
 		request.GetConnection().SendMsg(5, response)
@@ -191,6 +191,6 @@ func (r *Router) PostHandle(request ziface.IRequest) {
 }
 
 // GetFSM 获取 FSM 实例
-func (r *Router) GetFSM() *FSM {
-	return r.fsm
+func (r *Router) GetFSM() *KVServer {
+	return r.kv
 }
