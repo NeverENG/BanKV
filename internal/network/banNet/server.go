@@ -1,11 +1,11 @@
-package znet
+package banNet
 
 import (
 	"fmt"
 	"net"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/network/ziface"
+	"github.com/NeverENG/BanKV/internal/network/banIface"
 )
 
 type Server struct {
@@ -13,14 +13,14 @@ type Server struct {
 	Port      int
 	Name      string
 	IPVersion string
-	MsgHandle ziface.IMsgHandle
-	ConnMgr   ziface.IConnManager
+	MsgHandle banIface.IMsgHandle
+	ConnMgr   banIface.IConnManager
 
-	ConnStartFunc func(conn ziface.IConnect)
-	ConnStopFunc  func(conn ziface.IConnect)
+	ConnStartFunc func(conn banIface.IConnect)
+	ConnStopFunc  func(conn banIface.IConnect)
 }
 
-func (s *Server) AddRouter(msgId uint32, router ziface.IRouter) {
+func (s *Server) AddRouter(msgId uint32, router banIface.IRouter) {
 	s.MsgHandle.AddRouter(msgId, router)
 }
 
@@ -36,7 +36,7 @@ func CallBackClient(conn *net.TCPConn, buf []byte, cnt int) error {
 }
 */
 
-func NewServer() ziface.IServer {
+func NewServer() banIface.IServer {
 	return &Server{
 		IPVersion: "tcp4",
 		IP:        config.G.Host,
@@ -47,12 +47,12 @@ func NewServer() ziface.IServer {
 	}
 }
 
-func (s *Server) GetConnMgr() ziface.IConnManager {
+func (s *Server) GetConnMgr() banIface.IConnManager {
 	return s.ConnMgr
 }
 
 func (s *Server) Start() {
-	fmt.Printf("[START]ZIXServer:%s ip: %s port:%d \n", s.Name, s.IP, s.Port)
+	fmt.Printf("[START]BanKVNetWork:%s ip: %s port:%d \n", s.Name, s.IP, s.Port)
 
 	go func() {
 
@@ -81,7 +81,7 @@ func (s *Server) Start() {
 			}
 
 			dealConn := NewConnection(conn, cid, s.MsgHandle, s)
-			fmt.Println("协程启动")
+			fmt.Println("链接启动中")
 			go dealConn.Start()
 			cid++
 		}
@@ -98,13 +98,13 @@ func (s *Server) Serve() {
 	select {}
 }
 
-func (s *Server) SetConnStartFunc(f func(conn ziface.IConnect)) {
+func (s *Server) SetConnStartFunc(f func(conn banIface.IConnect)) {
 	s.ConnStartFunc = f
 }
-func (s *Server) SetConnStopFunc(f func(conn ziface.IConnect)) {
+func (s *Server) SetConnStopFunc(f func(conn banIface.IConnect)) {
 	s.ConnStopFunc = f
 }
-func (s *Server) CallConnStartFunc(conn ziface.IConnect) {
+func (s *Server) CallConnStartFunc(conn banIface.IConnect) {
 	if s.ConnStartFunc == nil {
 		fmt.Println("[ERROR] CallConnStartFunc is nil!")
 		return
@@ -112,7 +112,7 @@ func (s *Server) CallConnStartFunc(conn ziface.IConnect) {
 	s.ConnStartFunc(conn)
 }
 
-func (s *Server) CallConnStopFunc(conn ziface.IConnect) {
+func (s *Server) CallConnStopFunc(conn banIface.IConnect) {
 	if s.ConnStopFunc == nil {
 		fmt.Println("[ERROR] CallConnStopFunc is nil!")
 		return

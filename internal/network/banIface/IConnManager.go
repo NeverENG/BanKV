@@ -1,4 +1,4 @@
-package ziface
+package banIface
 
 type IConnManager interface {
 	Add(conn IConnect)

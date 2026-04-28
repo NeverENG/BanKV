@@ -1,4 +1,4 @@
-package znet
+package banNet
 
 import (
 	"context"
@@ -8,20 +8,20 @@ import (
 	"sync"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/network/ziface"
+	"github.com/NeverENG/BanKV/internal/network/banIface"
 )
 
-var _ ziface.IConnect = &Connection{}
+var _ banIface.IConnect = &Connection{}
 
 type Connection struct {
-	TCPServer ziface.IServer // 注入 ConnMgr
+	TCPServer banIface.IServer // 注入 ConnMgr
 	// 主要维护链接
 	Conn *net.TCPConn
 	// 链接的唯一 ID
 	ConnID uint32
 	// 该链接是否关闭
 	isClose   bool
-	MsgHandle ziface.IMsgHandle
+	MsgHandle banIface.IMsgHandle
 	// 该链接状态
 	ExitBuffChan chan bool
 
@@ -36,7 +36,7 @@ type Connection struct {
 	propertyLock sync.RWMutex
 }
 
-func NewConnection(conn *net.TCPConn, ConnID uint32, handle ziface.IMsgHandle, server ziface.IServer) *Connection {
+func NewConnection(conn *net.TCPConn, ConnID uint32, handle banIface.IMsgHandle, server banIface.IServer) *Connection {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &Connection{
 		TCPServer:    server,

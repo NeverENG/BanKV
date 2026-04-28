@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"log/slog"
 
-	"github.com/NeverENG/BanKV/internal/network/ziface"
+	"github.com/NeverENG/BanKV/internal/network/banIface"
 )
 
 // Router 基础路由处理器
@@ -12,9 +12,9 @@ type Router struct {
 	kv *KVServer
 
 	// 前置处理函数
-	preHandleFunc func(request ziface.IRequest)
+	preHandleFunc func(request banIface.IRequest)
 	// 后置处理函数
-	postHandleFunc func(request ziface.IRequest)
+	postHandleFunc func(request banIface.IRequest)
 }
 
 // NewRouter 创建新的路由处理器
@@ -25,24 +25,24 @@ func NewRouter(kv *KVServer) *Router {
 }
 
 // SetPreHandle 设置前置处理函数
-func (r *Router) SetPreHandle(f func(request ziface.IRequest)) {
+func (r *Router) SetPreHandle(f func(request banIface.IRequest)) {
 	r.preHandleFunc = f
 }
 
 // SetPostHandle 设置后置处理函数
-func (r *Router) SetPostHandle(f func(request ziface.IRequest)) {
+func (r *Router) SetPostHandle(f func(request banIface.IRequest)) {
 	r.postHandleFunc = f
 }
 
 // PreHandle 前置处理
-func (r *Router) PreHandle(request ziface.IRequest) {
+func (r *Router) PreHandle(request banIface.IRequest) {
 	if r.preHandleFunc != nil {
 		r.preHandleFunc(request)
 	}
 }
 
 // Handle 处理请求
-func (r *Router) Handle(request ziface.IRequest) {
+func (r *Router) Handle(request banIface.IRequest) {
 	// 获取消息类型和数据
 	msgID := request.GetMsgID()
 	data := request.GetMsgData()
@@ -58,7 +58,7 @@ func (r *Router) Handle(request ziface.IRequest) {
 }
 
 // handlePut 处理 PUT 操作
-func (r *Router) handlePut(data []byte, request ziface.IRequest) {
+func (r *Router) handlePut(data []byte, request banIface.IRequest) {
 	// 解析数据格式：key_len + key + value_len + value
 	if len(data) < 8 {
 		slog.Warn("[WARN] handlePut: data too short", "len", len(data))
@@ -111,7 +111,7 @@ func (r *Router) handlePut(data []byte, request ziface.IRequest) {
 }
 
 // handleGet 处理 GET 操作
-func (r *Router) handleGet(data []byte, request ziface.IRequest) {
+func (r *Router) handleGet(data []byte, request banIface.IRequest) {
 	// 解析数据格式：key_len + key
 	if len(data) < 4 {
 		return
@@ -149,7 +149,7 @@ func (r *Router) handleGet(data []byte, request ziface.IRequest) {
 }
 
 // handleDelete 处理 DELETE 操作
-func (r *Router) handleDelete(data []byte, request ziface.IRequest) {
+func (r *Router) handleDelete(data []byte, request banIface.IRequest) {
 	// 解析数据格式：key_len + key
 	if len(data) < 4 {
 		return
@@ -192,7 +192,7 @@ func (r *Router) handleDelete(data []byte, request ziface.IRequest) {
 }
 
 // PostHandle 后置处理
-func (r *Router) PostHandle(request ziface.IRequest) {
+func (r *Router) PostHandle(request banIface.IRequest) {
 	if r.postHandleFunc != nil {
 		r.postHandleFunc(request)
 	}

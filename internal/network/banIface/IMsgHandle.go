@@ -1,4 +1,4 @@
-package ziface
+package banIface
 
 type IMsgHandle interface {
 	AddRouter(msgId uint32, router IRouter)

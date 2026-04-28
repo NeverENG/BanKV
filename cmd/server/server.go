@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/NeverENG/BanKV/internal/network/znet"
+	"github.com/NeverENG/BanKV/internal/network/banNet"
 	"github.com/NeverENG/BanKV/internal/service"
 )
 
@@ -18,7 +18,7 @@ func main() {
 	ha := service.NewHA(KVServer)
 
 	// 初始化网络服务
-	server := znet.NewServer()
+	server := banNet.NewServer()
 
 	// 创建路由
 	router := service.NewRouter(KVServer)

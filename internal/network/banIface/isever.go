@@ -1,4 +1,4 @@
-package ziface
+package banIface
 
 type IServer interface {
 	Start()

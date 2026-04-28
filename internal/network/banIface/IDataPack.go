@@ -1,4 +1,4 @@
-package ziface
+package banIface
 
 type IDataPack interface {
 	GetHeadLen() uint32

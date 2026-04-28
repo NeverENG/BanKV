@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/NeverENG/BanKV/internal/network/ziface"
+	"github.com/NeverENG/BanKV/internal/network/banIface"
 )
 
 type GlobalConfig struct {
@@ -21,7 +21,7 @@ type GlobalConfig struct {
 	MaxMemTableSize   int
 	MaxCompactionSize int
 
-	TcpServer      ziface.IServer
+	TcpServer      banIface.IServer
 	MaxConn        int
 	MaxPackageSize uint32
 

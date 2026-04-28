@@ -1,7 +1,7 @@
-package znet
+package banNet
 
 import (
-	"github.com/NeverENG/BanKV/internal/network/ziface"
+	"github.com/NeverENG/BanKV/internal/network/banIface"
 )
 
 type Message struct {
@@ -11,7 +11,7 @@ type Message struct {
 	Data    []byte
 }
 
-var _ ziface.IMessage = &Message{}
+var _ banIface.IMessage = &Message{}
 
 func NewMessage(id uint32, data []byte) *Message {
 	return &Message{

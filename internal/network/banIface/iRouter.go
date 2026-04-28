@@ -1,4 +1,4 @@
-package ziface
+package banIface
 
 type IRouter interface {
 	PreHandle(request IRequest)

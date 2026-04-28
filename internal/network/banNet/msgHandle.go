@@ -1,32 +1,32 @@
-package znet
+package banNet
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/network/ziface"
+	"github.com/NeverENG/BanKV/internal/network/banIface"
 )
 
 type MsgHandle struct {
-	Arip           map[uint32]ziface.IRouter
+	Arip           map[uint32]banIface.IRouter
 	WorkerPoolSize uint32
-	TaskQueue      []chan ziface.IRequest
+	TaskQueue      []chan banIface.IRequest
 	ctx            context.Context
 }
 
 func NewMsgHandle() *MsgHandle {
 	return &MsgHandle{
-		Arip:           make(map[uint32]ziface.IRouter),
+		Arip:           make(map[uint32]banIface.IRouter),
 		WorkerPoolSize: config.G.WorkerPoolSize,
-		TaskQueue:      make([]chan ziface.IRequest, config.G.WorkerPoolSize),
+		TaskQueue:      make([]chan banIface.IRequest, config.G.WorkerPoolSize),
 		ctx:            context.Background(),
 	}
 }
 
-var _ ziface.IMsgHandle = &MsgHandle{}
+var _ banIface.IMsgHandle = &MsgHandle{}
 
-func (m *MsgHandle) AddRouter(msgID uint32, r ziface.IRouter) {
+func (m *MsgHandle) AddRouter(msgID uint32, r banIface.IRouter) {
 	if _, ok := m.Arip[msgID]; ok {
 		fmt.Println("duplicate Arip:", m.Arip)
 		return
@@ -34,7 +34,7 @@ func (m *MsgHandle) AddRouter(msgID uint32, r ziface.IRouter) {
 	m.Arip[msgID] = r
 }
 
-func (m *MsgHandle) DoMsgHandle(request ziface.IRequest) {
+func (m *MsgHandle) DoMsgHandle(request banIface.IRequest) {
 	handler, ok := m.Arip[request.GetMsgID()]
 	if !ok {
 		fmt.Println("[ERROR] 该 Msgid 没有注册:", request.GetMsgID())
@@ -47,18 +47,18 @@ func (m *MsgHandle) DoMsgHandle(request ziface.IRequest) {
 
 func (m *MsgHandle) StartWorkerPool() {
 	for i := 0; i < int(m.WorkerPoolSize); i++ {
-		m.TaskQueue[i] = make(chan ziface.IRequest, config.G.MaxWorkerTaskLen)
+		m.TaskQueue[i] = make(chan banIface.IRequest, config.G.MaxWorkerTaskLen)
 		go m.StartOneWorker(i, m.TaskQueue[i])
 	}
 }
 
-func (m *MsgHandle) SendMsgToTaskQueue(request ziface.IRequest) {
+func (m *MsgHandle) SendMsgToTaskQueue(request banIface.IRequest) {
 
 	workerID := request.GetConnection().GetConnID() % m.WorkerPoolSize
 	m.TaskQueue[workerID] <- request
 }
 
-func (m *MsgHandle) StartOneWorker(workerId int, taskQueue chan ziface.IRequest) {
+func (m *MsgHandle) StartOneWorker(workerId int, taskQueue chan banIface.IRequest) {
 	fmt.Println("Worker id:", workerId, "is started")
 	for {
 		select {

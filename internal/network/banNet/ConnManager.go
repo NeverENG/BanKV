@@ -1,37 +1,37 @@
-package znet
+package banNet
 
 import (
 	"sync"
 
-	"github.com/NeverENG/BanKV/internal/network/ziface"
+	"github.com/NeverENG/BanKV/internal/network/banIface"
 )
 
 type ConnManager struct {
 	mu          sync.RWMutex
-	connections map[uint32]ziface.IConnect
+	connections map[uint32]banIface.IConnect
 }
 
-var _ ziface.IConnManager = &ConnManager{}
+var _ banIface.IConnManager = &ConnManager{}
 
 func NewConnManager() *ConnManager {
 	return &ConnManager{
-		connections: make(map[uint32]ziface.IConnect),
+		connections: make(map[uint32]banIface.IConnect),
 	}
 }
 
-func (cm *ConnManager) Add(conn ziface.IConnect) {
+func (cm *ConnManager) Add(conn banIface.IConnect) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.connections[conn.GetConnID()] = conn
 }
 
-func (cm *ConnManager) Remove(conn ziface.IConnect) {
+func (cm *ConnManager) Remove(conn banIface.IConnect) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	delete(cm.connections, conn.GetConnID())
 }
 
-func (cm *ConnManager) Get(connId uint32) ziface.IConnect {
+func (cm *ConnManager) Get(connId uint32) banIface.IConnect {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 	if conn, ok := cm.connections[connId]; ok {

@@ -1,4 +1,4 @@
-package ziface
+package banIface
 
 type IMessage interface {
 	GetMsgID() uint32
