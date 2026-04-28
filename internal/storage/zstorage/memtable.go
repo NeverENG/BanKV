@@ -279,10 +279,16 @@ func (m *MemTable) Clear() error {
 	return m.wal.Clear()
 }
 
-func (m *MemTable) Close() error { return m.wal.Close() }
+func (m *MemTable) Close() error {
+	close(m.stopCh)
+	return m.wal.Close()
+}
 
 func (m *MemTable) StartFlush() {
-	m.FlushChan <- true
+	select {
+	case m.FlushChan <- true:
+	default:
+	}
 }
 
 func (m *MemTable) Flush() {
@@ -315,17 +321,17 @@ func (m *MemTable) FlushWorker() {
 }
 
 func (m *MemTable) collectAllEntry() []istorage.LogEntry {
-	LogEntrys := make([]istorage.LogEntry, m.Size())
+	logEntries := make([]istorage.LogEntry, 0, m.size)
 
 	p := m.head.Next[0]
-	for i := 0; i < m.Size(); i++ {
-		LogEntrys[i] = istorage.LogEntry{
+	for p != nil {
+		logEntries = append(logEntries, istorage.LogEntry{
 			Key:   p.Key,
 			Value: p.Value,
-		}
+		})
 		p = p.Next[0]
 	}
-	return LogEntrys
+	return logEntries
 }
 
 // resetMemTable 重置内存表
@@ -379,24 +385,29 @@ func (m *MemTable) ListenCompactCh() {
 	}
 }
 
-func (m *MemTable) CompactSSTable(level int) {
-	count := 0
-	for _, meta := range m.sst.GetAllMata() {
-		if meta.Level == level {
-			count++
+func (m *MemTable) CompactSSTable(startLevel int) {
+	maxLevel := 10
+
+	for level := startLevel; level < maxLevel; level++ {
+		files := m.sst.GetLevelFiles(level)
+
+		if len(files) < config.G.MaxCompactionSize {
+			continue
 		}
-	}
 
-	if count < config.G.MaxCompactionSize {
-		return
-	}
+		fmt.Printf("[COMPACTION] Level %d has %d files, merging...\n", level, len(files))
 
-	m.sst.MergeSSTable(m.sst.GetLevelFiles(level), level+1)
-	for _, meta := range m.sst.GetAllMata() {
-		if meta.Level == level {
+		newMeta := m.sst.MergeSSTable(files, level+1)
+		if newMeta == nil {
+			fmt.Printf("[ERROR] Failed to merge level %d\n", level)
+			continue
+		}
+
+		for _, meta := range files {
 			m.sst.DeleteSSTable(meta)
 			m.sst.RemoveMata(meta)
 		}
+
+		fmt.Printf("[COMPACTION] Level %d compaction completed\n", level)
 	}
-	m.CompactSSTable(level + 1)
 }
