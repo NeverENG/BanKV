@@ -68,22 +68,26 @@ func (w *WAL) Write(entry istorage.LogEntry) error {
 	return w.Sync()
 }
 
-func (w *WAL) Read(apply func(istorage.LogEntry) error) {
+func (w *WAL) Read() ([]istorage.LogEntry, error) {
 	// 如果 file 为 nil，跳过读取
 	if w.file == nil {
-		return
+		return nil, nil
 	}
+
 	if _, err := w.file.Seek(0, io.SeekStart); err != nil {
-		return
+		return nil, err
 	}
+
+	entries := make([]istorage.LogEntry, 0)
+
 	for {
 		header := make([]byte, HEADER_LENGTH)
 		_, err := w.file.Read(header)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
-				return
+				break
 			}
-			return
+			return entries, err
 		}
 
 		crc := binary.BigEndian.Uint32(header[:])
@@ -94,31 +98,32 @@ func (w *WAL) Read(apply func(istorage.LogEntry) error) {
 		_, err = w.file.Read(key)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return
+				break
 			}
-			return
+			return entries, err
 		}
+
 		value := make([]byte, valueLen)
 		_, err = w.file.Read(value)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return
+				break
 			}
-			return
+			return entries, err
 		}
 
-		haser := crc32.NewIEEE()
-		haser.Write(key)
-		haser.Write(value)
-		if crc != haser.Sum32() {
+		hasher := crc32.NewIEEE()
+		hasher.Write(key)
+		hasher.Write(value)
+		if crc != hasher.Sum32() {
 			slog.Error("[ERROR]:THE DATA ERROR !")
-			return
+			return entries, errors.New("data corruption detected")
 		}
-		err = apply(istorage.LogEntry{key, value})
-		if err != nil {
-			return
-		}
+
+		entries = append(entries, istorage.LogEntry{Key: key, Value: value})
 	}
+
+	return entries, nil
 }
 
 func (w *WAL) Close() error {

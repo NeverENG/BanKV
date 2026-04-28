@@ -25,6 +25,7 @@ type MemTable struct {
 
 	FlushChan chan bool
 	compactCh chan bool
+	stopCh    chan bool
 
 	wal *WAL
 	sst *SSTable
@@ -43,6 +44,8 @@ func NewMemTable() *MemTable {
 		size:      0,
 		level:     0,
 		FlushChan: make(chan bool, 1),
+		compactCh: make(chan bool, 1),
+		stopCh:    make(chan bool, 1),
 		head:      newSkipNode(MAXL, nil, nil),
 		wal:       NewWAL(),
 		sst:       NewSSTable(),
@@ -51,7 +54,7 @@ func NewMemTable() *MemTable {
 	go mt.ListenCompactCh()
 
 	go mt.sst.LoadSSTableMetaList()
-
+	mt.recoverFromWAL()
 	return mt
 
 }
@@ -101,7 +104,7 @@ func (m *MemTable) Get(key []byte) ([]byte, error) {
 		return p.Value, nil
 	}
 	fmt.Printf("[MEMTABLE] Get not found: key=%s\n", string(key))
-	return nil, nil
+	return nil, errors.New("Key not found")
 }
 
 // Set 插入或更新键值对
@@ -206,6 +209,68 @@ func (m *MemTable) Delete(key []byte) error {
 	return nil
 }
 
+func (m *MemTable) recoverFromWAL() {
+	entries, err := m.wal.Read()
+	if err != nil {
+		fmt.Printf("[WARN] Failed to read WAL: %v\n", err)
+		return
+	}
+
+	if len(entries) == 0 {
+		fmt.Println("[INFO] No WAL entries to recover")
+		return
+	}
+
+	fmt.Printf("[INFO] Recovering %d entries from WAL...\n", len(entries))
+
+	for _, entry := range entries {
+		// 直接插入跳表，不写 WAL（避免重复写入）
+		m.insertWithoutWAL(entry.Key, entry.Value)
+	}
+
+	fmt.Printf("[INFO] WAL recovery completed, memtable size: %d\n", m.size)
+}
+
+// insertWithoutWAL 不写 WAL 的情况下插入数据（用于恢复）
+func (m *MemTable) insertWithoutWAL(key []byte, value []byte) {
+	if m.head == nil {
+		return
+	}
+
+	update := make([]*SkipNode, MAXL)
+	p := m.head
+
+	for i := m.level - 1; i >= 0; i-- {
+		for p.Next[i] != nil && bytes.Compare(p.Next[i].Key, key) < 0 {
+			p = p.Next[i]
+		}
+		update[i] = p
+	}
+
+	p = p.Next[0]
+	if p != nil && bytes.Compare(p.Key, key) == 0 {
+		p.Value = value
+		return
+	}
+
+	newLevel := randomLevel()
+	if newLevel > m.level {
+		for i := m.level; i < newLevel; i++ {
+			update[i] = m.head
+		}
+		m.level = newLevel
+	}
+
+	newNode := newSkipNode(newLevel, key, value)
+
+	for i := 0; i < newLevel; i++ {
+		newNode.Next[i] = update[i].Next[i]
+		update[i].Next[i] = newNode
+	}
+
+	m.size++
+}
+
 func (m *MemTable) Sync() error {
 	return m.wal.Sync()
 }
@@ -214,9 +279,7 @@ func (m *MemTable) Clear() error {
 	return m.wal.Clear()
 }
 
-func (m *MemTable) Close() error {
-	return m.wal.Close()
-}
+func (m *MemTable) Close() error { return m.wal.Close() }
 
 func (m *MemTable) StartFlush() {
 	m.FlushChan <- true
@@ -244,6 +307,9 @@ func (m *MemTable) FlushWorker() {
 		case <-m.FlushChan:
 			fmt.Println("Flush")
 			m.Flush()
+		case <-m.stopCh:
+			fmt.Println("[INFO]STOP FLUSHWORKER")
+			return
 		}
 	}
 }
@@ -306,6 +372,9 @@ func (m *MemTable) ListenCompactCh() {
 		select {
 		case <-m.compactCh:
 			m.CompactSSTable(0)
+		case <-m.stopCh:
+			fmt.Println("[INFO]STOP COMPACTLISTENER")
+			return
 		}
 	}
 }
