@@ -10,5 +10,7 @@
   "WorkPoolSize": 3,
   "MaxWorkPoolTaskLen": 3,
   "MaxMsgChanLen": 3,
-  "MaxCompactionSize": 4
+  "MaxCompactionSize": 4,
+  "MaxMemTableP": 0.5,
+  "MaxMemTableLevel": 32
 }

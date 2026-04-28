@@ -49,6 +49,7 @@ type Raft struct {
 	heartbeatCh chan bool
 	ApplyCh     chan LogEntry
 
+	wal     *RaftWAL
 	addrMap map[int]string
 
 	commitCond *sync.Cond
@@ -77,6 +78,15 @@ func NewRaft(peers []string, me int) *Raft {
 		ApplyCh:         make(chan LogEntry, 100),
 		addrMap:         addrMap,
 	}
+
+	wal, _ := NewRaftWAL("raft_data")
+
+	r.wal = wal
+	term, votedFor, _ := r.wal.LoadState()
+	r.Term = term
+	r.votedFor = votedFor
+	logs, _ := wal.LoadLogs()
+	r.log = logs
 
 	r.commitCond = sync.NewCond(&r.mu)
 
@@ -120,6 +130,7 @@ func (r *Raft) startElection() {
 	r.state = Candidate
 	r.Term++
 	r.votedFor = r.me
+	r.wal.SaveState(r.Term, r.votedFor)
 
 	lastLogIndex := -1
 	lastLogTerm := 0
@@ -352,6 +363,7 @@ func (r *Raft) AppendEntry(command []byte) int {
 		Command: command,
 	}
 	r.log = append(r.log, entry)
+	r.wal.AppendLog(entry)
 
 	fmt.Printf("[RAFT] Appended entry: Index=%d, Term=%d\n", entry.Index, entry.Term)
 

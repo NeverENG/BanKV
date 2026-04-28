@@ -12,9 +12,9 @@ import (
 
 var _ istorage.IMemTable = &MemTable{}
 
-const (
-	MAXL = 32
-	P    = 0.5
+var (
+	MAXL = config.G.MaxMemTableLevel
+	P    = config.G.MaxMemTableP
 )
 
 // MemTable 基于跳表的内存表实现
@@ -25,7 +25,7 @@ type MemTable struct {
 
 	FlushChan chan bool
 	compactCh chan bool
-	stopCh    chan bool
+	stopCh    chan struct{}
 
 	wal *WAL
 	sst *SSTable
@@ -45,7 +45,7 @@ func NewMemTable() *MemTable {
 		level:     0,
 		FlushChan: make(chan bool, 1),
 		compactCh: make(chan bool, 1),
-		stopCh:    make(chan bool, 1),
+		stopCh:    make(chan struct{}),
 		head:      newSkipNode(MAXL, nil, nil),
 		wal:       NewWAL(),
 		sst:       NewSSTable(),
@@ -71,7 +71,7 @@ func newSkipNode(level int, key []byte, value []byte) *SkipNode {
 // randomLevel 生成随机层级
 func randomLevel() int {
 	level := 1
-	for rand.Float64() < P && level < MAXL {
+	for rand.Float32() < P && level < MAXL {
 		level++
 	}
 	return level
@@ -107,7 +107,7 @@ func (m *MemTable) Get(key []byte) ([]byte, error) {
 	return nil, errors.New("Key not found")
 }
 
-// Set 插入或更新键值对
+// Put 插入或更新键值对
 func (m *MemTable) Put(key []byte, value []byte) error {
 
 	if m.head == nil {
@@ -118,6 +118,7 @@ func (m *MemTable) Put(key []byte, value []byte) error {
 
 	if err != nil {
 		fmt.Println("Error writing to WAL:", err)
+		return err
 	}
 
 	// update 数组记录每一层需要更新的节点
@@ -187,8 +188,8 @@ func (m *MemTable) Delete(key []byte) error {
 	p = p.Next[0]
 	if p == nil || bytes.Compare(p.Key, key) != 0 {
 		// key 不存在
-		fmt.Println("the key is not exist")
-		return errors.New("KEY NO Found")
+		fmt.Println("the key does not exist")
+		return errors.New("KEY NOT FOUND")
 	}
 
 	// 在每一层删除节点

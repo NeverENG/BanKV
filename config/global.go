@@ -11,27 +11,26 @@ import (
 )
 
 type GlobalConfig struct {
-	Name string
-	Port int
-	Host string
-
-	WALPath     string
-	SSTablePath string
-
-	MaxMemTableSize int
-
-	MaxCompactionSize int
-
-	TcpServer ziface.IServer
-
+	Name    string
+	Port    int
+	Host    string
 	Version string
 
+	WALPath           string
+	SSTablePath       string
+	MaxMemTableSize   int
+	MaxCompactionSize int
+
+	TcpServer      ziface.IServer
 	MaxConn        int
 	MaxPackageSize uint32
 
 	WorkerPoolSize   uint32
 	MaxWorkerTaskLen uint32
 	MaxMsgChanLen    uint32
+
+	MaxMemTableP     float64
+	MaxMemTableLevel int
 
 	// Raft 集群配置
 	Peers []string // 集群中所有节点的地址
@@ -86,6 +85,8 @@ func NewGlobalConfig() *GlobalConfig {
 		MaxWorkerTaskLen: 10000,
 		MaxMsgChanLen:    100,
 		TcpServer:        nil,
+		MaxMemTableP:     0.5,
+		MaxMemTableLevel: 32,
 		MaxMemTableSize:  1024,
 		WALPath:          "../../../log/wal.log",
 		SSTablePath:      "../../../log",
