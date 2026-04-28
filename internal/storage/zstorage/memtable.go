@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/NeverENG/BanKV/config"
 	"github.com/NeverENG/BanKV/internal/storage/istorage"
 )
 
@@ -23,6 +24,7 @@ type MemTable struct {
 	head  *SkipNode
 
 	FlushChan chan bool
+	compactCh chan bool
 
 	wal *WAL
 	sst *SSTable
@@ -223,7 +225,7 @@ func (m *MemTable) Flush() {
 
 	allEntries := m.collectAllEntry()
 
-	_, err := m.sst.writeToSSTable(allEntries)
+	err := m.sst.writeToSSTable(allEntries)
 	if err != nil {
 		fmt.Printf("Flush error: %v\n", err)
 		return
@@ -286,4 +288,33 @@ func (m *MemTable) getFromSSTables(key []byte) ([]byte, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (m *MemTable) WriteSSTable() error {
+	err := m.sst.writeToSSTable(m.collectAllEntry())
+	m.compactCh <- true
+	return err
+}
+
+func (m *MemTable) ListenCompactCh() {
+	for {
+		select {
+		case <-m.compactCh:
+			m.CompactSSTable()
+		}
+	}
+}
+
+func (m *MemTable) CompactSSTable() {
+	count := 0
+
+	for _, meta := range m.sst.GetAllMata() {
+		if meta.Level == 0 {
+			count++
+		}
+	}
+
+	if count >= config.G.MaxCompactionSize {
+		m.sst.MergeSSTable(m.sst.GetLevelFiles(0), 1)
+	}
 }

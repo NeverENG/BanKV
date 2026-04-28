@@ -191,7 +191,13 @@ func (ss *SSTable) writeToSSTable(entries []istorage.LogEntry) error {
 }
 
 func (ss *SSTable) GetAllMata() []*istorage.SSTableMata {
-	return ss.mata
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+
+	// ✅ 返回指针的副本，但指针指向的对象是同一个！
+	result := make([]*istorage.SSTableMata, len(ss.mata))
+	copy(result, ss.mata) // ← 复制的是指针，不是对象本身
+	return result
 }
 
 func (ss *SSTable) ReadAllFromSSTable(filepath string) ([]*istorage.LogEntry, error) {
