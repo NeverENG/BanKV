@@ -1,10 +1,13 @@
 package storage
 
 import (
+	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/NeverENG/BanKV/config"
 	"github.com/NeverENG/BanKV/internal/storage/istorage"
+	"github.com/NeverENG/BanKV/internal/storage/zstorage"
 )
 
 type StorageCommand struct {
@@ -74,4 +77,45 @@ func (e *Engine) applyWorker() {
 			e.Delete(cmd.Key)
 		}
 	}
+}
+
+func (e *Engine) ApplySnapshot(data []byte) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	var state map[string]string
+	if err := json.Unmarshal(data, &state); err != nil {
+		return fmt.Errorf("failed to unmarshal snapshot: %v", err)
+	}
+
+	e.memTable = NewMemTable()
+
+	count := 0
+	for key, value := range state {
+		if err := e.memTable.Put([]byte(key), []byte(value)); err != nil {
+			return fmt.Errorf("failed to restore key %s: %v", key, err)
+		}
+		count++
+	}
+
+	fmt.Printf("[ENGINE] Snapshot applied, restored %d keys\n", count)
+	return nil
+}
+
+func (e *Engine) GetSnapshotData() ([]byte, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	allData := make(map[string]string)
+
+	entries := e.CollectAllEntries()
+	for _, entry := range entries {
+		allData[string(entry.Key)] = string(entry.Value)
+	}
+
+	return json.Marshal(allData)
+}
+
+func (e *Engine) CollectAllEntries() []istorage.LogEntry {
+	return e.memTable.CollectAllEntries()
 }
