@@ -344,6 +344,7 @@ func (ss *SSTable) MergeSSTable(files []*istorage.SSTableMata, targetLevel int) 
 		MaxKeyLoaded: true, // 新文件已有 MaxKey
 	}
 
+	ss.AddMata(newMeta)
 	fmt.Printf("[SSTABLE] Merged to Level %d: %s (keys: %d, size: %d bytes)\n",
 		targetLevel, filename, len(deduped), info.Size())
 

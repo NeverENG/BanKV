@@ -294,7 +294,10 @@ func (m *MemTable) getFromSSTables(key []byte) ([]byte, bool) {
 
 func (m *MemTable) WriteSSTable() error {
 	err := m.sst.writeToSSTable(m.collectAllEntry())
-	m.compactCh <- true
+	select {
+	case m.compactCh <- true:
+	default:
+	}
 	return err
 }
 
@@ -302,25 +305,29 @@ func (m *MemTable) ListenCompactCh() {
 	for {
 		select {
 		case <-m.compactCh:
-			m.CompactSSTable()
+			m.CompactSSTable(0)
 		}
 	}
 }
 
-func (m *MemTable) CompactSSTable() {
+func (m *MemTable) CompactSSTable(level int) {
 	count := 0
-
 	for _, meta := range m.sst.GetAllMata() {
-		if meta.Level == 0 {
+		if meta.Level == level {
 			count++
 		}
 	}
-	if count >= config.G.MaxCompactionSize {
-		m.sst.MergeSSTable(m.sst.GetLevelFiles(0), 1)
-		for _, meta := range m.sst.GetAllMata() {
-			if meta.Level == 1 {
-				m.sst.DeleteSSTable(meta)
-			}
+
+	if count < config.G.MaxCompactionSize {
+		return
+	}
+
+	m.sst.MergeSSTable(m.sst.GetLevelFiles(level), level+1)
+	for _, meta := range m.sst.GetAllMata() {
+		if meta.Level == level {
+			m.sst.DeleteSSTable(meta)
+			m.sst.RemoveMata(meta)
 		}
 	}
+	m.CompactSSTable(level + 1)
 }
