@@ -129,8 +129,8 @@ func (r *Router) handleGet(data []byte, request ziface.IRequest) {
 	// 从存储获取值
 	value, err := r.kv.Get(key)
 	if err != nil {
-		// 发送错误响应
-		response := []byte{0x01} // 错误标志
+		// 发送错误响应：1字节状态码
+		response := []byte{0x01}
 		request.GetConnection().SendMsg(5, response)
 		return
 	}

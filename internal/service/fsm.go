@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/NeverENG/BanKV/config"
@@ -89,6 +90,10 @@ func (k *KVServer) Get(key []byte) ([]byte, error) {
 	} else {
 		fmt.Printf("[INFO] Get result: %s\n", string(value))
 	}
+	if value == nil {
+		return nil, errors.New("key not found")
+	}
+
 	return value, err
 }
 

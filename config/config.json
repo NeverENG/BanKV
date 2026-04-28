@@ -1,7 +1,7 @@
 {
-  "MaxMemTableSize": 1024,
-  "WALPath": "log/wal.log",
-  "SSTablePath": "log",
+  "MaxMemTableSize": 1,
+  "WALPath": "../../log/wal.log",
+  "SSTablePath": "../../log",
   "Host": "127.0.0.1",
   "Port": 8080,
   "Name": "demo server",

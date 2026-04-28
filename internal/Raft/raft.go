@@ -136,7 +136,9 @@ func (r *Raft) startElection() {
 	}
 
 	peerCount := len(r.peers) - 1
-	voteCh := make(chan bool, peerCount)
+	votes := 1
+	voteCh := make(chan bool, peerCount+1)
+	voteCh <- true
 
 	for i := range r.peers {
 		if i == r.me {
@@ -172,8 +174,6 @@ func (r *Raft) startElection() {
 	r.mu.Unlock()
 
 	// 自己投自己一票
-	votes := 1
-	granted := make(chan bool, peerCount)
 
 	// 单节点模式：自己一票就超过半数，直接成为 Leader
 	if votes > len(r.peers)/2 {
@@ -189,7 +189,7 @@ func (r *Raft) startElection() {
 	timeout := time.After(500 * time.Millisecond)
 	for j := 0; j < peerCount; j++ {
 		select {
-		case voteGranted := <-granted:
+		case voteGranted := <-voteCh:
 			if voteGranted {
 				votes++
 				// 获得多数票，成为 Leader

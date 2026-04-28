@@ -2,13 +2,9 @@ package zstorage
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/NeverENG/BanKV/internal/storage/istorage"
 )
@@ -29,6 +25,7 @@ type MemTable struct {
 	FlushChan chan bool
 
 	wal *WAL
+	sst *SSTable
 }
 
 // SkipNode 跳表节点
@@ -40,13 +37,19 @@ type SkipNode struct {
 
 // NewMemTable 创建新的 MemTable
 func NewMemTable() *MemTable {
-	return &MemTable{
+	mt := &MemTable{
 		size:      0,
 		level:     0,
 		FlushChan: make(chan bool, 1),
 		head:      newSkipNode(MAXL, nil, nil),
 		wal:       NewWAL(),
+		sst:       NewSSTable(),
 	}
+	go mt.FlushWorker()
+	go mt.sst.LoadSSTableMetaList()
+
+	return mt
+
 }
 
 // newSkipNode 创建新的跳表节点
@@ -220,7 +223,7 @@ func (m *MemTable) Flush() {
 
 	allEntries := m.collectAllEntry()
 
-	err := m.writeToSSTable(allEntries)
+	_, err := m.sst.writeToSSTable(allEntries)
 	if err != nil {
 		fmt.Printf("Flush error: %v\n", err)
 		return
@@ -255,55 +258,6 @@ func (m *MemTable) collectAllEntry() []istorage.LogEntry {
 	return LogEntrys
 }
 
-func (m *MemTable) writeToSSTable(entries []istorage.LogEntry) error {
-	if len(entries) == 0 {
-		return nil
-	}
-
-	// 跳表本身是有序的，collectAllEntry 按顺序遍历，所以 entries 已经有序
-
-	// 2. 生成文件名并创建目录
-	filename := fmt.Sprintf("sstable_%d.sst", time.Now().UnixNano())
-	dir := "data"
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("create data directory failed: %v", err)
-	}
-	fullPath := filepath.Join(dir, filename)
-
-	// 3. 创建文件
-	file, err := os.Create(fullPath)
-	if err != nil {
-		return fmt.Errorf("create SSTable file failed: %v", err)
-	}
-	defer file.Close()
-
-	// 4. 写入数据
-	// 格式: [KeyLen(4B)][Key][ValueLen(4B)][Value]
-	for _, entry := range entries {
-		keyLen := uint32(len(entry.Key))
-		valueLen := uint32(len(entry.Value))
-
-		// 写入 Key 长度和内容
-		if err := binary.Write(file, binary.BigEndian, keyLen); err != nil {
-			return err
-		}
-		if _, err := file.Write(entry.Key); err != nil {
-			return err
-		}
-
-		// 写入 Value 长度和内容
-		if err := binary.Write(file, binary.BigEndian, valueLen); err != nil {
-			return err
-		}
-		if _, err := file.Write(entry.Value); err != nil {
-			return err
-		}
-	}
-
-	// 5. 确保数据刷入磁盘
-	return file.Sync()
-}
-
 // resetMemTable 重置内存表
 func (m *MemTable) resetMemTable() error {
 	m.head = newSkipNode(MAXL, nil, nil)
@@ -312,4 +266,24 @@ func (m *MemTable) resetMemTable() error {
 
 	err := m.Clear()
 	return err
+}
+
+func (m *MemTable) getFromSSTables(key []byte) ([]byte, bool) {
+	for _, meta := range m.sst.GetAllMata() {
+		// 首次访问时自动加载 MaxKey
+
+		meta.EnsureMeta()
+
+		// 现在可以用 MinKey 和 MaxKey 过滤了
+		if bytes.Compare(key, meta.MinKey) < 0 ||
+			bytes.Compare(key, meta.MaxKey) > 0 {
+			continue
+		}
+
+		// 在文件中查找
+		if value, found := m.sst.ReadFromSSTable(meta.Filepath, key); found {
+			return value, true
+		}
+	}
+	return nil, false
 }
