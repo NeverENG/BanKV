@@ -48,6 +48,8 @@ func NewMemTable() *MemTable {
 		sst:       NewSSTable(),
 	}
 	go mt.FlushWorker()
+	go mt.ListenCompactCh()
+
 	go mt.sst.LoadSSTableMetaList()
 
 	return mt
@@ -313,8 +315,12 @@ func (m *MemTable) CompactSSTable() {
 			count++
 		}
 	}
-
 	if count >= config.G.MaxCompactionSize {
 		m.sst.MergeSSTable(m.sst.GetLevelFiles(0), 1)
+		for _, meta := range m.sst.GetAllMata() {
+			if meta.Level == 1 {
+				m.sst.DeleteSSTable(meta)
+			}
+		}
 	}
 }

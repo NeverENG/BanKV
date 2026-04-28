@@ -9,5 +9,6 @@
   "MaxPackageSize": 1024,
   "WorkPoolSize": 3,
   "MaxWorkPoolTaskLen": 3,
-  "MaxMsgChanLen": 3
+  "MaxMsgChanLen": 3,
+  "MaxCompactionSize": 4
 }
