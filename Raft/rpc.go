@@ -1,6 +1,7 @@
 package Raft
 
 import (
+	"errors"
 	"net/rpc"
 )
 
@@ -39,7 +40,8 @@ type InstallSnapshotArgs struct {
 }
 
 type InstallSnapshotReply struct {
-	Term int
+	Term    int
+	Success bool
 }
 
 type RaftRPC struct {
@@ -151,11 +153,28 @@ func (r *RaftRPC) applyCommittedLogs() {
 }
 
 // 被调用端
-func (r *RaftRPC) InstallSnapshot(args *InstallSnapshotArgs) (*InstallSnapshotReply, error) {
+func (r *RaftRPC) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) error {
 	r.raft.mu.Lock()
 	defer r.raft.mu.Unlock()
 
-	return nil, nil
+	if args.Term < r.raft.Term {
+		reply.Term = r.raft.Term
+		reply.Success = false
+		return errors.New("Term is low")
+	}
+	if args.Term > r.raft.Term {
+		r.raft.Term = args.Term
+		r.raft.state = Follower
+		r.raft.votedFor = -1
+	}
+	// ToDo：reply.Data 读数据，持久化到层，删除老数据
+	
+	r.raft.LastIncludedIndex = args.LastIncludedIndex
+	r.raft.LastIncludedTerm = args.LastIncludedTerm
+
+	reply.Term = r.raft.Term
+	reply.Success = true
+	return nil
 }
 
 func (r *Raft) SendRequestVote(serverAddr string, args *RequestVoteArgs) (*RequestVoteReply, error) {

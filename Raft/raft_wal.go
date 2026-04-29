@@ -2,8 +2,12 @@ package Raft
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -11,6 +15,7 @@ const (
 	Version     = 1
 	StateFile   = "raft_state.dat"
 	LogFile     = "raft_log.dat"
+	SnapshotDir = "snapshots"
 )
 
 type RaftWAL struct {
@@ -184,3 +189,178 @@ func (w *RaftWAL) Clear() error {
 
 	return nil
 }
+
+// 从data中获得数据转换成快照
+
+func (w *RaftWAL) SaveSnapshot(data []byte, lastIncludedIndex int64, lastIncludedTerm int64) error {
+	snapshotDir := filepath.Join(filepath.Dir(w.logPath), SnapshotDir)
+	if err := os.MkdirAll(snapshotDir, 0755); err != nil {
+		return err
+	}
+	snapshotPath := filepath.Join(snapshotDir, fmt.Sprintf("%d_%d.snap", lastIncludedIndex, lastIncludedTerm))
+	f, err := os.Create(snapshotPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if err := binary.Write(f, binary.BigEndian, MagicNumber); err != nil {
+		return err
+	}
+	if err := binary.Write(f, binary.BigEndian, Version); err != nil {
+		return err
+	}
+	if err := binary.Write(f, binary.BigEndian, lastIncludedIndex); err != nil {
+		return err
+	}
+	if err := binary.Write(f, binary.BigEndian, lastIncludedTerm); err != nil {
+		return err
+	}
+	if err := binary.Write(f, binary.BigEndian, int64(len(data))); err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		return err
+	}
+	return f.Sync()
+}
+
+// LoadLatestSnapshot 加载最新的快照
+// 返回: data, lastIndex, lastTerm, error
+func (w *RaftWAL) LoadLatestSnapshot() ([]byte, int64, int64, error) {
+	snapshotDir := filepath.Join(filepath.Dir(w.logPath), SnapshotDir)
+
+	files, err := os.ReadDir(snapshotDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, 0, 0, nil
+		}
+		return nil, 0, 0, err
+	}
+
+	if len(files) == 0 {
+		return nil, 0, 0, nil
+	}
+
+	var latestFile string
+	var latestIndex int64
+
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".snap") {
+			name := file.Name()[:len(file.Name())-5]
+			parts := strings.Split(name, "_")
+			if len(parts) == 2 {
+				index, err1 := strconv.ParseInt(parts[0], 10, 64)
+				if err1 == nil && index > latestIndex {
+					latestIndex = index
+					latestFile = filepath.Join(snapshotDir, file.Name())
+				}
+			}
+		}
+	}
+
+	if latestFile == "" {
+		return nil, 0, 0, nil
+	}
+
+	f, err := os.Open(latestFile)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer f.Close()
+
+	var magic uint32
+	if err := binary.Read(f, binary.BigEndian, &magic); err != nil {
+		return nil, 0, 0, err
+	}
+	if magic != MagicNumber {
+		return nil, 0, 0, errors.New("invalid snapshot file")
+	}
+
+	var version uint32
+	if err := binary.Read(f, binary.BigEndian, &version); err != nil {
+		return nil, 0, 0, err
+	}
+
+	var lastIndex int64
+	if err := binary.Read(f, binary.BigEndian, &lastIndex); err != nil {
+		return nil, 0, 0, err
+	}
+
+	var lastTerm int64
+	if err := binary.Read(f, binary.BigEndian, &lastTerm); err != nil {
+		return nil, 0, 0, err
+	}
+
+	var dataLen int64
+	if err := binary.Read(f, binary.BigEndian, &dataLen); err != nil {
+		return nil, 0, 0, err
+	}
+
+	data := make([]byte, dataLen)
+	if _, err := f.Read(data); err != nil {
+		return nil, 0, 0, err
+	}
+
+	return data, lastIndex, lastTerm, nil
+}
+
+// DeleteOldSnapshots 删除旧版本的快照文件（保留指定的最新快照）
+func (w *RaftWAL) DeleteOldSnapshots(keepIndex int64) error {
+	snapshotDir := filepath.Join(filepath.Dir(w.logPath), SnapshotDir)
+
+	files, err := os.ReadDir(snapshotDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".snap") {
+			name := file.Name()[:len(file.Name())-5]
+			parts := strings.Split(name, "_")
+			if len(parts) == 2 {
+				index, err := strconv.ParseInt(parts[0], 10, 64)
+				if err == nil && index < keepIndex {
+					os.Remove(filepath.Join(snapshotDir, file.Name()))
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (w *RaftWAL) TruncateLogs(lastIncludedIndex int64) error {
+	logs, err := w.LoadLogs()
+	if err != nil {
+		return err
+	}
+
+	var remainingLogs []LogEntry
+	for _, log := range logs {
+		if int64(log.Index) > lastIncludedIndex {
+			remainingLogs = append(remainingLogs, log)
+		}
+	}
+
+	w.Close()
+
+	f, err := os.Create(w.logPath)
+	if err != nil {
+		return err
+	}
+	w.file = f
+
+	for _, log := range remainingLogs {
+		if err := w.AppendLog(log); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ... existing code ...

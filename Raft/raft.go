@@ -49,8 +49,8 @@ type Raft struct {
 	heartbeatCh chan bool
 	ApplyCh     chan LogEntry
 
-	LastIncludedIndex int
-	LastIncludedTerm  int
+	LastIncludedIndex int64
+	LastIncludedTerm  int64
 
 	wal     *RaftWAL
 	addrMap map[int]string
