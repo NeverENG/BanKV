@@ -3,7 +3,7 @@ package banNet
 import (
 	"sync"
 
-	"github.com/NeverENG/BanKV/internal/network/banIface"
+	"github.com/NeverENG/BanKV/network/banIface"
 )
 
 type ConnManager struct {

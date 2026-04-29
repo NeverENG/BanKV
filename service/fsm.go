@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/NeverENG/BanKV/Raft"
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/Raft"
-	"github.com/NeverENG/BanKV/internal/storage"
-	"github.com/NeverENG/BanKV/internal/storage/zstorage"
+	"github.com/NeverENG/BanKV/storage"
+	"github.com/NeverENG/BanKV/storage/zstorage"
 )
 
 type Command struct {

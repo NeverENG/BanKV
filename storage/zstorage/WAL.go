@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/storage/istorage"
+	"github.com/NeverENG/BanKV/storage/istorage"
 )
 
 const HEADER_LENGTH = 12

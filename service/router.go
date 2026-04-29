@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"log/slog"
 
-	"github.com/NeverENG/BanKV/internal/network/banIface"
+	"github.com/NeverENG/BanKV/network/banIface"
 )
 
 // Router 基础路由处理器

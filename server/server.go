@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/NeverENG/BanKV/internal/network/banNet"
-	"github.com/NeverENG/BanKV/internal/service"
+	"github.com/NeverENG/BanKV/network/banNet"
+	"github.com/NeverENG/BanKV/service"
 )
 
 func main() {

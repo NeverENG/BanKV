@@ -6,8 +6,7 @@ import (
 	"sync"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/storage/istorage"
-	"github.com/NeverENG/BanKV/internal/storage/zstorage"
+	"github.com/NeverENG/BanKV/storage/istorage"
 )
 
 type StorageCommand struct {

@@ -30,6 +30,18 @@ type AppendEntriesReply struct {
 	Success bool
 }
 
+type InstallSnapshotArgs struct {
+	Term              int
+	LeaderID          int
+	Data              []byte
+	LastIncludedIndex int32
+	LastIncludedTerm  int
+}
+
+type InstallSnapshotReply struct {
+	Term int
+}
+
 type RaftRPC struct {
 	raft *Raft
 }
@@ -138,6 +150,14 @@ func (r *RaftRPC) applyCommittedLogs() {
 	}
 }
 
+// 被调用端
+func (r *RaftRPC) InstallSnapshot(args *InstallSnapshotArgs) (*InstallSnapshotReply, error) {
+	r.raft.mu.Lock()
+	defer r.raft.mu.Unlock()
+
+	return nil, nil
+}
+
 func (r *Raft) SendRequestVote(serverAddr string, args *RequestVoteArgs) (*RequestVoteReply, error) {
 	client, err := rpc.Dial("tcp", serverAddr)
 	if err != nil {
@@ -163,6 +183,22 @@ func (r *Raft) SendAppendEntries(serverAddr string, args *AppendEntriesArgs) (*A
 
 	var reply AppendEntriesReply
 	err = client.Call("RaftRPC.AppendEntries", args, &reply)
+	if err != nil {
+		return nil, err
+	}
+
+	return &reply, nil
+}
+
+func (r *Raft) SendInstallSnapshot(serverAddr string, args *InstallSnapshotArgs) (*InstallSnapshotReply, error) {
+	client, err := rpc.Dial("tcp", serverAddr)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	var reply InstallSnapshotReply
+	err = client.Call("RaftRPC.InstallSnapshot", args, &reply)
 	if err != nil {
 		return nil, err
 	}

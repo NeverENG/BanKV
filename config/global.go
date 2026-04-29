@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/NeverENG/BanKV/internal/network/banIface"
+	"github.com/NeverENG/BanKV/network/banIface"
 )
 
 type GlobalConfig struct {

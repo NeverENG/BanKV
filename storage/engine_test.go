@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/storage/zstorage"
+	"github.com/NeverENG/BanKV/storage/zstorage"
 )
 
 func setupTestEngine(t *testing.T) (*Engine, func()) {

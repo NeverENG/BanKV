@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/network/banIface"
+	"github.com/NeverENG/BanKV/network/banIface"
 )
 
 type DataPack struct{}

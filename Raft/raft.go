@@ -49,6 +49,9 @@ type Raft struct {
 	heartbeatCh chan bool
 	ApplyCh     chan LogEntry
 
+	LastIncludedIndex int
+	LastIncludedTerm  int
+
 	wal     *RaftWAL
 	addrMap map[int]string
 
@@ -441,6 +444,13 @@ func (r *Raft) replicateLog() {
 			}
 		}(i, args)
 	}
+}
+
+func (r *Raft) SendInstallSnapshot(peer int) {
+	r.mu.Lock()
+	// 构建 rpc
+	r.mu.Unlock()
+
 }
 
 func (r *Raft) WaitCommitIndex(index int) {

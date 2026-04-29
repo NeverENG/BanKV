@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/NeverENG/BanKV/config"
-	"github.com/NeverENG/BanKV/internal/network/banIface"
+	"github.com/NeverENG/BanKV/network/banIface"
 )
 
 var _ banIface.IConnect = &Connection{}

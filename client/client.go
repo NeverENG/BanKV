@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/NeverENG/BanKV/internal/network/banNet"
+	"github.com/NeverENG/BanKV/network/banNet"
 	"github.com/NeverENG/BanKV/pkg/utils"
 )
 

@@ -15,60 +15,61 @@
 
 ```
 BanKV/
-├── cmd/
-│   ├── server/          # 服务端入口，负责启动 Raft、存储引擎和网络服务
-│   │   ├── server.go    # 服务端主程序
-│   │   ├── run.bat      # Windows 启动脚本
-│   │   └── run-clean.bat# Windows 清理数据后启动脚本
-│   └── client/          # 客户端入口，支持交互模式和命令行模式
-│       ├── main.go      # 客户端主程序
-│       ├── client.go    # 客户端核心逻辑
-│       ├── interactive.go# 交互式客户端实现
-│       ├── README.md    # 客户端使用说明
-│       └── run.bat      # Windows 启动脚本
-├── internal/
-│   ├── Raft/            # Raft 一致性协议实现
-│   │   ├── raft.go      # 选主、日志复制、状态机应用核心逻辑
-│   │   ├── raft_test.go # Raft 算法测试
-│   │   ├── raft_wal.go  # Raft 日志持久化
-│   │   ├── rpc.go       # RPC 通信结构定义
-│   │   └── rpc_test.go  # RPC 通信测试
-│   ├── storage/         # 存储引擎核心 (LSM-Tree)
-│   │   ├── engine.go    # 存储引擎封装，对外提供 Put/Get/Delete 接口
-│   │   ├── engine_test.go# 存储引擎测试
-│   │   ├── istorage/    # 存储接口定义
-│   │   │   └── interfaces.go# 存储相关接口
-│   │   └── zstorage/    # 存储引擎具体实现
-│   │       ├── memtable.go  # 内存表 (跳表实现)
-│   │       ├── memtable_test.go# MemTable 测试
-│   │       ├── WAL.go       # 预写日志实现
-│   │       └── wal_test.go  # WAL 测试
-│   ├── network/         # 网络通信框架
-│   │   ├── ziface/      # 网络接口定义
-│   │   │   ├── IConnManager.go# 连接管理器接口
-│   │   │   ├── IDataPack.go   # 数据打包接口
-│   │   │   ├── IMsgHandle.go  # 消息处理接口
-│   │   │   ├── iRequest.go    # 请求接口
-│   │   │   ├── iRouter.go     # 路由接口
-│   │   │   ├── iconnect.go    # 连接接口
-│   │   │   ├── imessage.go    # 消息接口
-│   │   │   └── isever.go      # 服务器接口
-│   │   └── znet/        # 网络框架实现
-│   │       ├── server.go    # TCP 服务器实现
-│   │       ├── server_test.go# 服务器测试
-│   │       ├── connection.go# 连接管理实现
-│   │       ├── ConnManager.go# 连接管理器
-│   │       ├── msgHandle.go # 消息处理器
-│   │       ├── DataPack.go  # 数据打包器
-│   │       ├── request.go   # 请求实现
-│   │       ├── router.go    # 路由实现
-│   │       └── message.go   # 消息实现
-│   └── service/         # 业务逻辑层
-│       ├── fsm.go       # 状态机应用逻辑 (Raft -> Storage)
-│       ├── fsm_test.go  # FSM 测试
-│       ├── router.go    # 请求路由处理 (PUT/GET/DELETE)
-│       ├── ha.go        # 高可用监控
-│       └── test_service_wal.log# 测试用 WAL 日志
+├── client/              # 客户端入口，支持交互模式和命令行模式
+│   ├── main.go          # 客户端主程序
+│   ├── client.go        # 客户端核心逻辑
+│   ├── interactive.go   # 交互式客户端实现
+│   ├── README.md        # 客户端使用说明
+│   └── run.bat          # Windows 启动脚本
+├── server/              # 服务端入口，负责启动 Raft、存储引擎和网络服务
+│   ├── server.go        # 服务端主程序
+│   ├── run.bat          # Windows 启动脚本
+│   └── run-clean.bat    # Windows 清理数据后启动脚本
+├── Raft/                # Raft 一致性协议实现
+│   ├── raft.go          # 选主、日志复制、状态机应用核心逻辑
+│   ├── raft_test.go     # Raft 算法测试
+│   ├── raft_wal.go      # Raft 日志持久化
+│   ├── rpc.go           # RPC 通信结构定义
+│   └── rpc_test.go      # RPC 通信测试
+├── storage/             # 存储引擎核心 (LSM-Tree)
+│   ├── engine.go        # 存储引擎封装，对外提供 Put/Get/Delete 接口
+│   ├── engine_test.go   # 存储引擎测试
+│   ├── istorage/        # 存储接口定义
+│   │   ├── Entry.go     # 存储条目定义
+│   │   ├── IMemTable.go # MemTable 接口
+│   │   ├── IWal.go      # WAL 接口
+│   │   └── SSTable.go   # SSTable 接口
+│   └── zstorage/        # 存储引擎具体实现
+│       ├── memtable.go      # 内存表 (跳表实现)
+│       ├── memtable_test.go # MemTable 测试
+│       ├── WAL.go           # 预写日志实现
+│       ├── wal_test.go      # WAL 测试
+│       └── SSTable.go       # SSTable 实现
+├── network/             # 网络通信框架
+│   ├── banIface/        # 网络接口定义
+│   │   ├── IConnManager.go # 连接管理器接口
+│   │   ├── IDataPack.go    # 数据打包接口
+│   │   ├── IMsgHandle.go   # 消息处理接口
+│   │   ├── iRequest.go     # 请求接口
+│   │   ├── iRouter.go      # 路由接口
+│   │   ├── iconnect.go     # 连接接口
+│   │   ├── imessage.go     # 消息接口
+│   │   └── isever.go       # 服务器接口
+│   └── banNet/        # 网络框架实现
+│       ├── server.go      # TCP 服务器实现
+│       ├── connection.go  # 连接管理实现
+│       ├── ConnManager.go # 连接管理器
+│       ├── msgHandle.go   # 消息处理器
+│       ├── DataPack.go    # 数据打包器
+│       ├── request.go     # 请求实现
+│       ├── router.go      # 路由实现
+│       └── message.go     # 消息实现
+├── service/             # 业务逻辑层
+│   ├── fsm.go           # 状态机应用逻辑 (Raft -> Storage)
+│   ├── fsm_test.go      # FSM 测试
+│   ├── router.go        # 请求路由处理 (PUT/GET/DELETE)
+│   ├── ha.go            # 高可用监控
+│   └── test_service_wal.log # 测试用 WAL 日志
 ├── config/              # 配置管理
 │   ├── config.json      # JSON 配置文件
 │   └── global.go        # 全局配置加载和管理
@@ -76,12 +77,10 @@ BanKV/
 │   ├── byteBuilder.go   # 字节构建工具
 │   ├── datapack.go      # 数据打包工具
 │   └── message.go       # 消息处理工具
-├── data/                # 数据存储目录 (SSTable)
-├── log/                 # 日志文件目录
+├── log/                 # 日志和数据存储目录
 │   ├── SSTable          # SSTable 日志
 │   └── wal.log          # WAL 日志
 ├── .idea/               # IDE 配置目录
-├── .trae/               # Trae 配置目录
 ├── .ignore              # 忽略文件配置
 ├── go.mod               # Go 模块定义
 ├── README.md            # 项目说明文档
