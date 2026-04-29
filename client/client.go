@@ -82,7 +82,7 @@ func (c *Client) SendPut(key []byte, value []byte) error {
 	}
 
 	if response[0] == 0x01 {
-		return fmt.Errorf("server error")
+		return fmt.Errorf("Server error")
 	}
 
 	return nil
@@ -128,7 +128,7 @@ func (c *Client) SendGet(key []byte) ([]byte, error) {
 	}
 
 	if response[0] == 0x01 {
-		return nil, fmt.Errorf("key not found or server error")
+		return nil, fmt.Errorf("key not found or Server error")
 	}
 
 	// 解析 value：状态(1字节) + value_len(4字节) + value
@@ -185,7 +185,7 @@ func (c *Client) SendDelete(key []byte) error {
 	}
 
 	if response[0] == 0x01 {
-		return fmt.Errorf("server error")
+		return fmt.Errorf("Server error")
 	}
 
 	return nil

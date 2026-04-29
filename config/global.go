@@ -41,7 +41,7 @@ func (g *GlobalConfig) Init() {
 	// 尝试多个可能的路径
 	paths := []string{
 		"config/config.json",       // 从项目根目录运行
-		"../config/config.json",    // 从 cmd/server 或 cmd/client 运行
+		"../config/config.json",    // 从 cmd/Server 或 cmd/client 运行
 		"../../config/config.json", // 从更深层目录运行
 		"config.json",              // 当前目录
 	}

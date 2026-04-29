@@ -97,12 +97,12 @@ BanKV/
 
 ```bash
 # 方法1: 使用启动脚本 (推荐)
-cd cmd/server
+cd cmd/Server
 ./run.bat
 
 # 方法2: 手动启动
 cd BanKV
-go run cmd/server/server.go
+go run cmd/Server/Server.go
 ```
 
 ### 启动客户端

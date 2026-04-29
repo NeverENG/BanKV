@@ -89,7 +89,7 @@ func (s *Server) Start() {
 }
 
 func (s *Server) Stop() {
-	fmt.Println("[STOP]server listener at IP : " + s.IP)
+	fmt.Println("[STOP]Server listener at IP : " + s.IP)
 	// 处理副作用并安全推出
 }
 

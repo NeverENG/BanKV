@@ -29,7 +29,7 @@ func main() {
 	server.AddRouter(3, router) // DELETE 操作
 
 	// 启动服务
-	fmt.Println("Starting server...")
+	fmt.Println("Starting Server...")
 	fmt.Printf("HA initialized, initial health status: %v\n", ha.IsHealthy())
 	server.Serve()
 }

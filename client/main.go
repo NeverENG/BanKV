@@ -32,7 +32,7 @@ func runCommandLineMode() {
 	// 连接服务端
 	err := c.Connect()
 	if err != nil {
-		fmt.Printf("Error connecting to server: %v\n", err)
+		fmt.Printf("Error connecting to Server: %v\n", err)
 		return
 	}
 	defer c.Close()
