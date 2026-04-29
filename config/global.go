@@ -35,6 +35,10 @@ type GlobalConfig struct {
 	// Raft 集群配置
 	Peers []string // 集群中所有节点的地址
 	Me    int      // 当前节点在 Peers 中的索引（0-based）
+
+	// Raft 快照配置
+	RaftSnapshotThreshold   int // 触发快照的日志数量阈值
+	RaftSnapshotKeepEntries int // 快照后保留的日志条目数
 }
 
 func (g *GlobalConfig) Init() {
@@ -92,6 +96,8 @@ func NewGlobalConfig() *GlobalConfig {
 		SSTablePath:      "../../../log",
 		Peers:            []string{"localhost:8080"}, // 默认单节点
 		Me:               0,                          // 默认节点ID
+		RaftSnapshotThreshold:   1000,                // 默认快照阈值
+		RaftSnapshotKeepEntries: 100,                 // 默认保留条目数
 	}
 	global.Init()
 	global.ParseFlags()

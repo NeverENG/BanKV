@@ -12,5 +12,7 @@
   "MaxMsgChanLen": 3,
   "MaxCompactionSize": 4,
   "MaxMemTableP": 0.5,
-  "MaxMemTableLevel": 32
+  "MaxMemTableLevel": 32,
+  "RaftSnapshotThreshold": 1000,
+  "RaftSnapshotKeepEntries": 100
 }

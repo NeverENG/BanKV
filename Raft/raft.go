@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/NeverENG/BanKV/config"
 )
 
 const (
@@ -25,6 +27,7 @@ type LogEntry struct {
 	Index   int
 	Term    int
 	Command []byte
+	IsSnapshot bool
 }
 
 type Raft struct {
@@ -41,6 +44,8 @@ type Raft struct {
 
 	commitIndex int
 	lastApplied int
+	lastSnapshotIndex int
+
 	nextIndex   []int
 	matchIndex  []int
 	log         []LogEntry
@@ -73,6 +78,7 @@ func NewRaft(peers []string, me int) *Raft {
 		electionTimeout: MinElectionTimeout + time.Duration(rand.Int63n(int64(MaxElectionTimeout-MinElectionTimeout))),
 		commitIndex:     -1,
 		lastApplied:     -1,
+
 		nextIndex:       make([]int, len(peers)),
 		matchIndex:      make([]int, len(peers)),
 		log:             make([]LogEntry, 0),
@@ -85,11 +91,28 @@ func NewRaft(peers []string, me int) *Raft {
 	wal, _ := NewRaftWAL("raft_data")
 
 	r.wal = wal
-	term, votedFor, _ := r.wal.LoadState()
-	r.Term = term
-	r.votedFor = votedFor
-	logs, _ := wal.LoadLogs()
-	r.log = logs
+	
+	// 从磁盘加载持久化状态（currentTerm, votedFor, log, snapshot metadata）
+	if err := r.readPersist(); err != nil {
+		fmt.Printf("[RAFT WARN] Failed to load persisted state: %v\n", err)
+	}
+
+	// 如果有快照，通知 FSM
+	if r.LastIncludedIndex > 0 && r.ApplyCh != nil {
+		snapshotData, _, _, err := wal.LoadLatestSnapshot()
+		if err == nil && snapshotData != nil {
+			select {
+			case r.ApplyCh <- LogEntry{
+				Index:      int(r.LastIncludedIndex),
+				Term:       int(r.LastIncludedTerm),
+				Command:    snapshotData,
+				IsSnapshot: true,
+			}:
+			default:
+				fmt.Println("[WARN] ApplyCh is full during initialization, snapshot skipped")
+			}
+		}
+	}
 
 	r.commitCond = sync.NewCond(&r.mu)
 
@@ -98,6 +121,42 @@ func NewRaft(peers []string, me int) *Raft {
 	return r
 }
 
+// persistLocked 持久化 Raft 状态（必须在持有锁的情况下调用）
+func (r *Raft) persistLocked() {
+	data := PersistData{
+		CurrentTerm:       r.Term,
+		VotedFor:          r.votedFor,
+		Log:               r.log,
+		LastIncludedIndex: r.LastIncludedIndex,
+		LastIncludedTerm:  r.LastIncludedTerm,
+	}
+
+	if err := r.wal.SavePersist(data); err != nil {
+		fmt.Printf("[RAFT ERROR] Failed to persist state: %v\n", err)
+	}
+}
+
+// readPersist 从磁盘加载 Raft 状态
+func (r *Raft) readPersist() error {
+	data, err := r.wal.LoadPersist()
+	if err != nil {
+		return err
+	}
+
+	r.Term = data.CurrentTerm
+	r.votedFor = data.VotedFor
+	r.log = data.Log
+	r.LastIncludedIndex = data.LastIncludedIndex
+	r.LastIncludedTerm = data.LastIncludedTerm
+
+	if r.LastIncludedIndex > 0 {
+		r.commitIndex = int(r.LastIncludedIndex)
+		r.lastApplied = int(r.LastIncludedIndex)
+		r.lastSnapshotIndex = int(r.LastIncludedIndex)
+	}
+
+	return nil
+}
 func (r *Raft) Start() {
 	if r.state == Leader {
 		r.startHeartbeatLoop()
@@ -133,7 +192,7 @@ func (r *Raft) startElection() {
 	r.state = Candidate
 	r.Term++
 	r.votedFor = r.me
-	r.wal.SaveState(r.Term, r.votedFor)
+	r.persistLocked()  // 持久化 Term 和 votedFor
 
 	lastLogIndex := -1
 	lastLogTerm := 0
@@ -349,6 +408,42 @@ func (r *Raft) applyCommittedLogs() {
 			r.ApplyCh <- r.log[r.lastApplied]
 		}
 	}
+
+	// 检查是否需要触发快照
+	r.checkSnapshotTrigger()
+}
+
+// checkSnapshotTrigger 检查是否应该触发快照
+func (r *Raft) checkSnapshotTrigger() {
+	if r.state != Leader {
+		return
+	}
+
+	// 如果日志长度超过阈值，触发快照
+	logLength := len(r.log)
+	threshold := 1000 // 默认阈值
+	keepEntries := 100 // 保留的条目数
+
+	// 从配置中读取（如果可用）
+	if config.G.RaftSnapshotThreshold > 0 {
+		threshold = config.G.RaftSnapshotThreshold
+	}
+	if config.G.RaftSnapshotKeepEntries > 0 {
+		keepEntries = config.G.RaftSnapshotKeepEntries
+	}
+
+	if logLength > threshold {
+		// 计算快照索引：保留最新的 keepEntries 条日志
+		snapshotIndex := r.commitIndex - keepEntries
+		if snapshotIndex > r.lastSnapshotIndex {
+			fmt.Printf("[RAFT] Triggering snapshot: log length=%d, threshold=%d, snapshot index=%d\n",
+				logLength, threshold, snapshotIndex)
+
+			// 这里需要上层应用提供快照数据
+			// 实际使用时，应该通过回调或通道请求 FSM 生成快照
+			// TODO: 实现快照生成逻辑
+		}
+	}
 }
 
 func (r *Raft) AppendEntry(command []byte) int {
@@ -366,7 +461,7 @@ func (r *Raft) AppendEntry(command []byte) int {
 		Command: command,
 	}
 	r.log = append(r.log, entry)
-	r.wal.AppendLog(entry)
+	r.persistLocked()  // 持久化日志条目
 
 	fmt.Printf("[RAFT] Appended entry: Index=%d, Term=%d\n", entry.Index, entry.Term)
 
@@ -446,12 +541,7 @@ func (r *Raft) replicateLog() {
 	}
 }
 
-func (r *Raft) SendInstallSnapshot(peer int) {
-	r.mu.Lock()
-	// 构建 rpc
-	r.mu.Unlock()
 
-}
 
 func (r *Raft) WaitCommitIndex(index int) {
 	r.mu.Lock()
@@ -486,3 +576,83 @@ func (r *Raft) GetCommitIndex() int {
 	defer r.mu.Unlock()
 	return r.commitIndex
 }
+
+func (r *Raft) TakeSnapshot(index int, data []byte) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if index <= r.lastSnapshotIndex {
+		return fmt.Errorf("snapshot index %d is not greater than last snapshot index %d", index, r.lastSnapshotIndex)
+	}
+
+	if index > r.commitIndex {
+		return fmt.Errorf("cannot snapshot uncommitted index %d, commitIndex is %d", index, r.commitIndex)
+	}
+
+	// 获取快照包含的最后一条日志的 term
+	var term int
+	if index == int(r.LastIncludedIndex) {
+		term = int(r.LastIncludedTerm)
+	} else {
+		// 将绝对索引转换为 log 数组的相对索引
+		logIndex := index - int(r.LastIncludedIndex) - 1
+		if logIndex < 0 || logIndex >= len(r.log) {
+			return fmt.Errorf("invalid snapshot index %d, LastIncludedIndex=%d, log length=%d",
+				index, r.LastIncludedIndex, len(r.log))
+		}
+		term = r.log[logIndex].Term
+	}
+
+	// 1. 先保存快照到磁盘
+	if err := r.wal.SaveSnapshot(data, int64(index), int64(term)); err != nil {
+		return fmt.Errorf("failed to save snapshot: %w", err)
+	}
+
+	// 2. 删除旧快照
+	r.wal.DeleteOldSnapshots(int64(index))
+
+	// 3. 截断 WAL 日志（删除快照包含的日志）
+	if err := r.wal.TruncateLogs(int64(index)); err != nil {
+		return fmt.Errorf("failed to truncate logs: %w", err)
+	}
+
+	// 4. 清理内存中的日志并重新编号
+	newLogStart := index - int(r.LastIncludedIndex)
+	if newLogStart > 0 && newLogStart <= len(r.log) {
+		r.log = r.log[newLogStart:]
+		for i := range r.log {
+			r.log[i].Index = index + 1 + i
+		}
+	} else {
+		r.log = []LogEntry{}
+	}
+
+	// 5. 更新元数据
+	r.lastSnapshotIndex = index
+	r.LastIncludedIndex = int64(index)
+	r.LastIncludedTerm = int64(term)
+
+	fmt.Printf("[RAFT] Snapshot created: Index=%d, Term=%d\n", index, term)
+
+	// 6. 通知 FSM 应用快照
+	if r.ApplyCh != nil {
+		snapshotEntry := LogEntry{
+			Index:      index,
+			Term:       term,
+			Command:    data,
+			IsSnapshot: true,
+		}
+		select {
+		case r.ApplyCh <- snapshotEntry:
+			fmt.Printf("[RAFT] Snapshot notification sent to FSM: Index=%d\n", index)
+		default:
+			fmt.Println("[WARN] ApplyCh is full, snapshot notification skipped")
+		}
+	}
+
+	// 7. 持久化状态
+	r.persistLocked()
+
+	return nil
+}
+

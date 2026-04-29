@@ -29,6 +29,15 @@ type WALState struct {
 	VotedFor int
 }
 
+// PersistData 包含所有需要持久化的 Raft 状态
+type PersistData struct {
+	CurrentTerm       int
+	VotedFor          int
+	Log               []LogEntry
+	LastIncludedIndex int64
+	LastIncludedTerm  int64
+}
+
 func NewRaftWAL(dir string) (*RaftWAL, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
@@ -361,6 +370,61 @@ func (w *RaftWAL) TruncateLogs(lastIncludedIndex int64) error {
 	}
 
 	return nil
+}
+
+// SavePersist 保存所有 Raft 持久化状态（currentTerm, votedFor, log）
+func (w *RaftWAL) SavePersist(data PersistData) error {
+	// 1. 保存 currentTerm 和 votedFor
+	if err := w.SaveState(data.CurrentTerm, data.VotedFor); err != nil {
+		return fmt.Errorf("failed to save state: %w", err)
+	}
+
+	// 2. 重建日志文件
+	w.Close()
+
+	f, err := os.Create(w.logPath)
+	if err != nil {
+		return fmt.Errorf("failed to create log file: %w", err)
+	}
+	w.file = f
+
+	// 3. 写入所有日志条目
+	for _, entry := range data.Log {
+		if err := w.AppendLog(entry); err != nil {
+			return fmt.Errorf("failed to append log entry: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// LoadPersist 加载所有 Raft 持久化状态
+func (w *RaftWAL) LoadPersist() (PersistData, error) {
+	data := PersistData{}
+
+	// 1. 加载 currentTerm 和 votedFor
+	term, votedFor, err := w.LoadState()
+	if err != nil {
+		return data, fmt.Errorf("failed to load state: %w", err)
+	}
+	data.CurrentTerm = term
+	data.VotedFor = votedFor
+
+	// 2. 加载日志
+	logs, err := w.LoadLogs()
+	if err != nil {
+		return data, fmt.Errorf("failed to load logs: %w", err)
+	}
+	data.Log = logs
+
+	// 3. 加载快照元数据
+	snapshotData, lastIndex, lastTerm, err := w.LoadLatestSnapshot()
+	if err == nil && snapshotData != nil {
+		data.LastIncludedIndex = lastIndex
+		data.LastIncludedTerm = lastTerm
+	}
+
+	return data, nil
 }
 
 // ... existing code ...

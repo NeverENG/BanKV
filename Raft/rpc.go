@@ -1,7 +1,7 @@
 package Raft
 
 import (
-	"errors"
+	"fmt"
 	"net/rpc"
 )
 
@@ -35,8 +35,8 @@ type InstallSnapshotArgs struct {
 	Term              int
 	LeaderID          int
 	Data              []byte
-	LastIncludedIndex int32
-	LastIncludedTerm  int
+	LastIncludedIndex int64
+	LastIncludedTerm  int64
 }
 
 type InstallSnapshotReply struct {
@@ -70,6 +70,7 @@ func (r *RaftRPC) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) er
 		r.raft.Term = args.Term
 		r.raft.state = Follower
 		r.raft.votedFor = -1
+		r.raft.persistLocked()
 	}
 
 	votedForMe := r.raft.votedFor == -1 || r.raft.votedFor == args.CandidateID
@@ -77,6 +78,7 @@ func (r *RaftRPC) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) er
 
 	if votedForMe && logUpToDate {
 		r.raft.votedFor = args.CandidateID
+		r.raft.persistLocked()
 		reply.VoteGranted = true
 	} else {
 		reply.VoteGranted = false
@@ -115,6 +117,7 @@ func (r *RaftRPC) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesRep
 		r.raft.Term = args.Term
 		r.raft.state = Follower
 		r.raft.votedFor = -1
+		r.raft.persistLocked()
 	}
 
 	if len(r.raft.log) > 0 && (args.PrevLogIndex >= len(r.raft.log) || r.raft.log[args.PrevLogIndex].Term != args.PrevLogTerm) {
@@ -131,6 +134,11 @@ func (r *RaftRPC) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesRep
 		if logIndex >= len(r.raft.log) {
 			r.raft.log = append(r.raft.log, entry)
 		}
+	}
+
+	// 持久化接收到的日志
+	if len(args.Entries) > 0 {
+		r.raft.persistLocked()
 	}
 
 	if args.LeaderCommit > r.raft.commitIndex {
@@ -160,17 +168,78 @@ func (r *RaftRPC) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnaps
 	if args.Term < r.raft.Term {
 		reply.Term = r.raft.Term
 		reply.Success = false
-		return errors.New("Term is low")
+		return nil
 	}
 	if args.Term > r.raft.Term {
 		r.raft.Term = args.Term
 		r.raft.state = Follower
 		r.raft.votedFor = -1
 	}
-	// ToDo：reply.Data 读数据，持久化到层，删除老数据
-	
+
+	if args.LastIncludedIndex <= int64(r.raft.commitIndex) {
+		// 快照比已提交的还旧，不需要应用
+		reply.Success = false
+		reply.Term = r.raft.Term
+		return nil
+	}
+
+	// 1. 先保存快照到磁盘
+	if err := r.raft.wal.SaveSnapshot(args.Data, args.LastIncludedIndex, args.LastIncludedTerm); err != nil {
+		fmt.Printf("[RAFT ERROR] Failed to save snapshot: %v\n", err)
+		reply.Success = false
+		reply.Term = r.raft.Term
+		return err
+	}
+
+	// 2. 删除旧快照
+	r.raft.wal.DeleteOldSnapshots(args.LastIncludedIndex)
+
+	// 3. 清理内存中的日志并重新编号
+	if len(r.raft.log) > 0 {
+		// 计算需要保留的日志起始位置（相对于 LastIncludedIndex）
+		newLogStart := int(args.LastIncludedIndex) - int(r.raft.LastIncludedIndex)
+		if newLogStart > 0 && newLogStart <= len(r.raft.log) {
+			r.raft.log = r.raft.log[newLogStart:]
+			for i := range r.raft.log {
+				r.raft.log[i].Index = int(args.LastIncludedIndex) + 1 + i
+			}
+		} else {
+			r.raft.log = []LogEntry{}
+		}
+	}
+
+	// 4. 截断 WAL 日志
+	if err := r.raft.wal.TruncateLogs(args.LastIncludedIndex); err != nil {
+		fmt.Printf("[RAFT ERROR] Failed to truncate logs: %v\n", err)
+		reply.Success = false
+		reply.Term = r.raft.Term
+		return err
+	}
+
+	// 5. 更新元数据
+	r.raft.commitIndex = int(args.LastIncludedIndex)
+	r.raft.lastApplied = int(args.LastIncludedIndex)
 	r.raft.LastIncludedIndex = args.LastIncludedIndex
 	r.raft.LastIncludedTerm = args.LastIncludedTerm
+
+	// 6. 通知 FSM 应用快照
+	if r.raft.ApplyCh != nil {
+		snapshotEntry := LogEntry{
+			Index:      int(args.LastIncludedIndex),
+			Term:       int(args.LastIncludedTerm),
+			Command:    args.Data,
+			IsSnapshot: true,
+		}
+		select {
+		case r.raft.ApplyCh <- snapshotEntry:
+			fmt.Printf("[RAFT] Snapshot delivered to FSM: Index=%d\n", args.LastIncludedIndex)
+		default:
+			fmt.Println("[WARN] ApplyCh is full, snapshot delivery skipped")
+		}
+	}
+
+	// 7. 持久化状态
+	r.raft.persistLocked()
 
 	reply.Term = r.raft.Term
 	reply.Success = true
