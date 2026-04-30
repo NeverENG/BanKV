@@ -71,7 +71,7 @@ func newSkipNode(level int, key []byte, value []byte) *SkipNode {
 // randomLevel 生成随机层级
 func randomLevel() int {
 	level := 1
-	for rand.Float32() < P && level < MAXL {
+	for rand.Float64() < P && level < MAXL {
 		level++
 	}
 	return level
