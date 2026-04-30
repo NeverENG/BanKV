@@ -24,9 +24,9 @@ const (
 )
 
 type LogEntry struct {
-	Index   int
-	Term    int
-	Command []byte
+	Index      int
+	Term       int
+	Command    []byte
 	IsSnapshot bool
 }
 
@@ -42,13 +42,13 @@ type Raft struct {
 	timer           *time.Timer
 	heartbeatTicker *time.Ticker
 
-	commitIndex int
-	lastApplied int
+	commitIndex       int
+	lastApplied       int
 	lastSnapshotIndex int
 
-	nextIndex   []int
-	matchIndex  []int
-	log         []LogEntry
+	nextIndex  []int
+	matchIndex []int
+	log        []LogEntry
 
 	electionCh  chan bool
 	heartbeatCh chan bool
@@ -79,19 +79,19 @@ func NewRaft(peers []string, me int) *Raft {
 		commitIndex:     -1,
 		lastApplied:     -1,
 
-		nextIndex:       make([]int, len(peers)),
-		matchIndex:      make([]int, len(peers)),
-		log:             make([]LogEntry, 0),
-		electionCh:      make(chan bool),
-		heartbeatCh:     make(chan bool),
-		ApplyCh:         make(chan LogEntry, 100),
-		addrMap:         addrMap,
+		nextIndex:   make([]int, len(peers)),
+		matchIndex:  make([]int, len(peers)),
+		log:         make([]LogEntry, 0),
+		electionCh:  make(chan bool),
+		heartbeatCh: make(chan bool),
+		ApplyCh:     make(chan LogEntry, 100),
+		addrMap:     addrMap,
 	}
 
 	wal, _ := NewRaftWAL("raft_data")
 
 	r.wal = wal
-	
+
 	// 从磁盘加载持久化状态（currentTerm, votedFor, log, snapshot metadata）
 	if err := r.readPersist(); err != nil {
 		fmt.Printf("[RAFT WARN] Failed to load persisted state: %v\n", err)
@@ -124,8 +124,8 @@ func NewRaft(peers []string, me int) *Raft {
 // persistLocked 持久化 Raft 状态（必须在持有锁的情况下调用）
 func (r *Raft) persistLocked() {
 	data := PersistData{
-		CurrentTerm:       r.Term,
-		VotedFor:          r.votedFor,
+		CurrentTerm:       int64(r.Term),
+		VotedFor:          int64(r.votedFor),
 		Log:               r.log,
 		LastIncludedIndex: r.LastIncludedIndex,
 		LastIncludedTerm:  r.LastIncludedTerm,
@@ -143,8 +143,8 @@ func (r *Raft) readPersist() error {
 		return err
 	}
 
-	r.Term = data.CurrentTerm
-	r.votedFor = data.VotedFor
+	r.Term = int(data.CurrentTerm)
+	r.votedFor = int(data.VotedFor)
 	r.log = data.Log
 	r.LastIncludedIndex = data.LastIncludedIndex
 	r.LastIncludedTerm = data.LastIncludedTerm
@@ -192,7 +192,7 @@ func (r *Raft) startElection() {
 	r.state = Candidate
 	r.Term++
 	r.votedFor = r.me
-	r.persistLocked()  // 持久化 Term 和 votedFor
+	r.persistLocked() // 持久化 Term 和 votedFor
 
 	lastLogIndex := -1
 	lastLogTerm := 0
@@ -421,7 +421,7 @@ func (r *Raft) checkSnapshotTrigger() {
 
 	// 如果日志长度超过阈值，触发快照
 	logLength := len(r.log)
-	threshold := 1000 // 默认阈值
+	threshold := 1000  // 默认阈值
 	keepEntries := 100 // 保留的条目数
 
 	// 从配置中读取（如果可用）
@@ -461,7 +461,7 @@ func (r *Raft) AppendEntry(command []byte) int {
 		Command: command,
 	}
 	r.log = append(r.log, entry)
-	r.persistLocked()  // 持久化日志条目
+	r.persistLocked() // 持久化日志条目
 
 	fmt.Printf("[RAFT] Appended entry: Index=%d, Term=%d\n", entry.Index, entry.Term)
 
@@ -540,8 +540,6 @@ func (r *Raft) replicateLog() {
 		}(i, args)
 	}
 }
-
-
 
 func (r *Raft) WaitCommitIndex(index int) {
 	r.mu.Lock()
@@ -655,4 +653,3 @@ func (r *Raft) TakeSnapshot(index int, data []byte) error {
 
 	return nil
 }
-

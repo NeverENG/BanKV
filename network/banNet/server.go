@@ -3,6 +3,7 @@ package banNet
 import (
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/NeverENG/BanKV/config"
 	"github.com/NeverENG/BanKV/network/banIface"
@@ -13,6 +14,7 @@ type Server struct {
 	Port      int
 	Name      string
 	IPVersion string
+	ExitCh    chan os.Signal
 	MsgHandle banIface.IMsgHandle
 	ConnMgr   banIface.IConnManager
 
@@ -24,24 +26,13 @@ func (s *Server) AddRouter(msgId uint32, router banIface.IRouter) {
 	s.MsgHandle.AddRouter(msgId, router)
 }
 
-/*
-基础回显函数 v 0.2
-func CallBackClient(conn *net.TCPConn, buf []byte, cnt int) error {
-	fmt.Println("[CallBack]START")
-	if _, err := conn.Write(buf[:cnt]); err != nil {
-		fmt.Println("[CallBack]Write err:", err)
-		return errors.New("CallBackToClient error")
-	}
-	return nil
-}
-*/
-
 func NewServer() banIface.IServer {
 	return &Server{
 		IPVersion: "tcp4",
 		IP:        config.G.Host,
 		Name:      config.G.Name,
 		Port:      config.G.Port,
+		ExitCh:    make(chan os.Signal),
 		MsgHandle: NewMsgHandle(),
 		ConnMgr:   NewConnManager(),
 	}
@@ -69,28 +60,33 @@ func (s *Server) Start() {
 		var cid uint32
 		cid = 0
 		for {
-			conn, err := listener.AcceptTCP()
-			if err != nil {
-				fmt.Println("[ERROR] Accept err :", err)
-				continue
-			}
+			select {
+			case <-s.ExitCh:
+				s.Stop()
+			default:
+				conn, err := listener.AcceptTCP()
+				if err != nil {
+					fmt.Println("[ERROR] Accept err :", err)
+					continue
+				}
 
-			if s.ConnMgr.Len() >= config.G.MaxConn {
-				conn.Close()
-				continue
-			}
+				if s.ConnMgr.Len() >= config.G.MaxConn {
+					conn.Close()
+					continue
+				}
 
-			dealConn := NewConnection(conn, cid, s.MsgHandle, s)
-			fmt.Println("链接启动中")
-			go dealConn.Start()
-			cid++
+				dealConn := NewConnection(conn, cid, s.MsgHandle, s)
+				fmt.Println("链接启动中")
+				go dealConn.Start()
+				cid++
+			}
 		}
 	}()
 }
 
 func (s *Server) Stop() {
-	fmt.Println("[STOP]Server listener at IP : " + s.IP)
-	// 处理副作用并安全推出
+	fmt.Println("[INFO]Server listener at IP : " + s.IP)
+	// 待处理副作用
 }
 
 func (s *Server) Serve() {

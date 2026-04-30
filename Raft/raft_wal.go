@@ -25,14 +25,14 @@ type RaftWAL struct {
 }
 
 type WALState struct {
-	Term     int
-	VotedFor int
+	Term     int64
+	VotedFor int64
 }
 
 // PersistData 包含所有需要持久化的 Raft 状态
 type PersistData struct {
-	CurrentTerm       int
-	VotedFor          int
+	CurrentTerm       int64
+	VotedFor          int64
 	Log               []LogEntry
 	LastIncludedIndex int64
 	LastIncludedTerm  int64
@@ -64,7 +64,7 @@ func (w *RaftWAL) Close() error {
 	return nil
 }
 
-func (w *RaftWAL) SaveState(term int, votedFor int) error {
+func (w *RaftWAL) SaveState(term int64, votedFor int64) error {
 	state := WALState{Term: term, VotedFor: votedFor}
 
 	f, err := os.Create(w.metaPath)
@@ -89,7 +89,7 @@ func (w *RaftWAL) SaveState(term int, votedFor int) error {
 	return f.Sync()
 }
 
-func (w *RaftWAL) LoadState() (int, int, error) {
+func (w *RaftWAL) LoadState() (int64, int64, error) {
 	f, err := os.Open(w.metaPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -122,7 +122,7 @@ func (w *RaftWAL) LoadState() (int, int, error) {
 		return 0, -1, err
 	}
 
-	return int(term), int(votedFor), nil
+	return term, votedFor, nil
 }
 
 func (w *RaftWAL) AppendLog(entry LogEntry) error {
