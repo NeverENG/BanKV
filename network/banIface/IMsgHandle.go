@@ -5,4 +5,5 @@ type IMsgHandle interface {
 	DoMsgHandle(request IRequest)
 	StartWorkerPool()
 	SendMsgToTaskQueue(request IRequest)
+	Stop()
 }
