@@ -1,7 +1,6 @@
 package banNet
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/NeverENG/BanKV/config"
@@ -12,7 +11,6 @@ type MsgHandle struct {
 	Arip           map[uint32]banIface.IRouter
 	WorkerPoolSize uint32
 	TaskQueue      []chan banIface.IRequest
-	ctx            context.Context
 }
 
 func NewMsgHandle() *MsgHandle {
@@ -20,7 +18,6 @@ func NewMsgHandle() *MsgHandle {
 		Arip:           make(map[uint32]banIface.IRouter),
 		WorkerPoolSize: config.G.WorkerPoolSize,
 		TaskQueue:      make([]chan banIface.IRequest, config.G.WorkerPoolSize),
-		ctx:            context.Background(),
 	}
 }
 
@@ -62,11 +59,23 @@ func (m *MsgHandle) StartOneWorker(workerId int, taskQueue chan banIface.IReques
 	fmt.Println("Worker id:", workerId, "is started")
 	for {
 		select {
-		case request := <-taskQueue:
+		case request, ok := <-taskQueue:
+			if !ok {
+				fmt.Println("[ERROR] taskQueue is closed")
+				return
+			}
 			m.DoMsgHandle(request)
-
-		case <-m.ctx.Done():
-			return
 		}
 	}
+}
+
+func (m *MsgHandle) Stop() {
+	fmt.Println("[INFO] MsgHandle send the quit signal")
+
+	for i := 0; i < int(m.WorkerPoolSize); i++ {
+		if m.TaskQueue[i] != nil {
+			close(m.TaskQueue[i])
+		}
+	}
+	fmt.Println("[INFO] WorkPool closing")
 }

@@ -20,6 +20,7 @@ type Server struct {
 
 	ConnStartFunc func(conn banIface.IConnect)
 	ConnStopFunc  func(conn banIface.IConnect)
+	listener      *net.TCPListener
 }
 
 func (s *Server) AddRouter(msgId uint32, router banIface.IRouter) {
@@ -52,17 +53,25 @@ func (s *Server) Start() {
 		TcPAddr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {
 			fmt.Println("[ERROR] Get the Tcp Addr err :", err)
+			return
 		}
 		listener, err := net.ListenTCP(s.IPVersion, TcPAddr)
 		if err != nil {
 			fmt.Println("[ERROR] ListenTcp err :", err)
+			return
 		}
+		s.listener = listener
+
 		var cid uint32
 		cid = 0
+
 		for {
 			select {
 			case <-s.ExitCh:
 				s.Stop()
+				fmt.Println("[INFO] Server Exit")
+
+				return
 			default:
 				conn, err := listener.AcceptTCP()
 				if err != nil {
@@ -86,7 +95,15 @@ func (s *Server) Start() {
 
 func (s *Server) Stop() {
 	fmt.Println("[INFO]Server listener at IP : " + s.IP)
-	// 待处理副作用
+
+	s.ConnMgr.ClearConn()
+	s.MsgHandle.Stop()
+
+	if s.listener != nil {
+		fmt.Println("[INFO]Server listener at Port : " + fmt.Sprint(s.Port))
+		s.listener.Close()
+	}
+	fmt.Println("[INFO]安全退出")
 }
 
 func (s *Server) Serve() {
